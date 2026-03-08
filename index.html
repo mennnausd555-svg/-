@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Viral Script AI</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>" />
+    <script>
+      // Fix for 'Cannot set property fetch of #<Window> which has only a getter'
+      // This happens when some libraries try to polyfill fetch in environments where it's read-only.
+      (function() {
+        try {
+          const prop = 'fetch';
+          const originalFetch = window.fetch;
+          if (typeof originalFetch !== 'function') return;
+          const boundFetch = originalFetch.bind(window);
+
+          console.log('[FetchFix] Initial descriptor:', Object.getOwnPropertyDescriptor(window, prop));
+
+          function patch(obj, name) {
+            try {
+              const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+              if (!descriptor || descriptor.configurable) {
+                Object.defineProperty(obj, prop, {
+                  value: boundFetch,
+                  writable: true,
+                  configurable: true,
+                  enumerable: true
+                });
+                console.log(`[FetchFix] Patched ${name} successfully`);
+                return true;
+              }
+              console.warn(`[FetchFix] Could not patch ${name}: descriptor is not configurable`, descriptor);
+              
+              // If it's a getter and not configurable, we might be stuck unless we can patch the prototype
+              if (descriptor.get && !descriptor.set) {
+                console.error(`[FetchFix] ${name}.fetch is a getter-only and non-configurable!`);
+              }
+            } catch (e) {
+              console.error(`[FetchFix] Error patching ${name}:`, e);
+            }
+            return false;
+          }
+
+          // Try patching window, globalThis, self
+          patch(window, 'window');
+          patch(globalThis, 'globalThis');
+          patch(self, 'self');
+          
+          // Also try patching the prototype
+          if (window.Window && window.Window.prototype) {
+            patch(window.Window.prototype, 'Window.prototype');
+          }
+
+          // Global error handler to catch and ignore this specific error if it still happens
+          window.addEventListener('error', function(event) {
+            if (event.error && event.error.message && event.error.message.includes('Cannot set property fetch')) {
+              console.warn('Caught and suppressed fetch assignment error:', event.error.message);
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }, true);
+        } catch (e) {
+          console.error('[FetchFix] Fatal error in polyfill fix:', e);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
