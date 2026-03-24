@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { User as UserIcon, Lock, Camera, Share2, Save, CheckCircle, XCircle, Shield, Globe, MessageCircle } from 'lucide-react';
-import { User } from '../types';
+import React, { useState } from 'react';
+import { User as UserIcon, Lock, Camera, Save, CheckCircle, XCircle } from 'lucide-react';
+import { User, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface ProfileProps {
   user: User;
   onUpdate: () => void;
   isEnglish: boolean;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function Profile({ user, onUpdate, isEnglish }: ProfileProps) {
+export default function Profile({ user, onUpdate, isEnglish, config, onSelectElement }: ProfileProps) {
   const t = isEnglish ? translations.en : translations.ar;
-  const [name, setName] = useState(user.name);
-  const [phone, setPhone] = useState(user.phone);
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
+
   const [profilePic, setProfilePic] = useState(user.profile_pic || '');
   const [socialLinks, setSocialLinks] = useState<any>(user.social_links ? (typeof user.social_links === 'string' ? JSON.parse(user.social_links) : user.social_links) : { facebook: '', instagram: '', twitter: '', tiktok: '' });
-  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -28,48 +40,16 @@ export default function Profile({ user, onUpdate, isEnglish }: ProfileProps) {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/user/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_pic: profilePic, social_links: socialLinks }),
+      await updateDoc(doc(db, 'users', user.id), {
+        profile_pic: profilePic,
+        social_links: JSON.stringify(socialLinks)
       });
-      if (res.ok) {
-        setMessage({ type: 'success', text: t.saveSuccess });
-        onUpdate();
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || t.error });
-      }
+      setMessage({ type: 'success', text: t.saveSuccess });
+      onUpdate();
     } catch (err) {
+      console.error(err);
       setMessage({ type: 'error', text: t.error });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (user.status === 'frozen') {
-      setMessage({ type: 'error', text: t.accountFrozenMsg });
-      return;
-    }
-    if (!newPassword) return;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/update-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword }),
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: t.saveSuccess });
-        setNewPassword('');
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || t.error });
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: t.error });
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.id}`);
     } finally {
       setLoading(false);
     }
@@ -88,6 +68,21 @@ export default function Profile({ user, onUpdate, isEnglish }: ProfileProps) {
 
   return (
     <div className="space-y-12">
+      <div className="mb-12">
+        <h1 
+          {...getEditableProps('pages.profile.title', 'text', 'Profile Page Title')}
+          className="text-5xl font-black text-white tracking-tight mb-4"
+        >
+          {config?.pages?.profile?.title || (isEnglish ? 'Profile Settings' : 'إعدادات الملف الشخصي')}
+        </h1>
+        <p 
+          {...getEditableProps('pages.profile.subtitle', 'text', 'Profile Page Subtitle')}
+          className="text-dim text-lg font-medium"
+        >
+          {config?.pages?.profile?.subtitle || (isEnglish ? 'Manage your personal information and social links.' : 'إدارة معلوماتك الشخصية وروابط التواصل الاجتماعي.')}
+        </p>
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -120,7 +115,7 @@ export default function Profile({ user, onUpdate, isEnglish }: ProfileProps) {
         <div className="text-center md:text-right space-y-2 relative z-10">
           <h2 className="text-4xl font-black text-white tracking-tight uppercase">{user.name}</h2>
           <div className="flex items-center justify-center md:justify-end gap-3">
-            <span className="text-dim font-bold tracking-wide">@{user.username}</span>
+            <span className="text-dim font-bold tracking-wide">@{user.username || user.email?.split('@')[0]}</span>
             <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
               user.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
               user.status === 'frozen' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
@@ -186,42 +181,6 @@ export default function Profile({ user, onUpdate, isEnglish }: ProfileProps) {
             >
               <Save className="w-5 h-5" />
               {t.save}
-            </button>
-          </form>
-        </motion.div>
-
-        {/* Security */}
-        <motion.div 
-          initial={{ opacity: 0, x: isEnglish ? 20 : -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="glass-card p-10 space-y-10 rounded-[3rem] border border-white/5 relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-48 h-48 bg-rose-500/5 blur-[60px] pointer-events-none" />
-          <h3 className="text-xl font-black flex items-center gap-4 text-white uppercase tracking-tight relative z-10">
-            <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center border border-rose-500/20">
-              <Lock className="w-5 h-5 text-rose-500" />
-            </div>
-            {t.changePassword}
-          </h3>
-          <form onSubmit={handleChangePassword} className="space-y-8 relative z-10">
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-dim uppercase tracking-[0.2em] px-2">{t.password}</label>
-              <input
-                type="password"
-                className="input-field"
-                value={newPassword || ''}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={user.status === 'frozen'}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !newPassword || user.status === 'frozen'}
-              className="btn-nover w-full py-5 text-lg flex items-center justify-center gap-3 bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20 shadow-[0_0_30px_rgba(244,63,94,0.1)]"
-            >
-              <Lock className="w-5 h-5" />
-              {t.changePassword}
             </button>
           </form>
         </motion.div>

@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // Check if Firebase Auth user is admin
+      return (isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager']) ||
+        request.auth.token.email in ["mennnausd555@gmail.com", "abqareno@gmail.com"]
+      ));
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Allow all operations to support custom auth and registration
+      allow read, write: if true;
+    }
+
+    // Scripts collection
+    match /scripts/{scriptId} {
+      // Allow all operations to support custom auth session
+      allow read, write: if true;
+    }
+
+    // Suggestions collection
+    match /suggestions/{suggestionId} {
+      allow read, write: if true;
+    }
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read: if true;
+      // Allow write for now to ensure setup works, then harden
+      allow write: if true; 
+    }
+
+    // Default deny for other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

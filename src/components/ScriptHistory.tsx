@@ -4,6 +4,7 @@ import { ScriptHistory, ScriptResult } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { db, collection, query, where, getDocs, orderBy, handleFirestoreError, OperationType, auth } from '../firebase';
 
 export default function ScriptHistoryView() {
  const [history, setHistory] = useState<ScriptHistory[]>([]);
@@ -17,21 +18,54 @@ export default function ScriptHistoryView() {
 
  const fetchHistory = async () => {
  try {
- const res = await fetch('/api/scripts');
- if (!res.ok) throw new Error('فشل تحميل السجل');
- const data = await res.json();
- setHistory(data);
+   const user = auth.currentUser;
+   if (!user) {
+     setLoading(false);
+     return;
+   }
+
+   const q = query(
+     collection(db, 'scripts'),
+     where('user_id', '==', user.uid),
+     orderBy('created_at', 'desc')
+   );
+
+   const querySnapshot = await getDocs(q);
+   const scriptsData = querySnapshot.docs.map(doc => {
+     const data = doc.data() as any;
+     return {
+       id: doc.id,
+       ...data,
+       content: typeof data.content === 'string' ? JSON.parse(data.content) : data.content,
+       inputs: typeof data.inputs === 'string' ? JSON.parse(data.inputs) : data.inputs,
+     };
+   }) as ScriptHistory[];
+
+   setHistory(scriptsData);
  } catch (err) {
- console.error(err);
+   console.error(err);
+   handleFirestoreError(err, OperationType.LIST, 'scripts');
  } finally {
- setLoading(false);
+   setLoading(false);
  }
  };
 
- const filteredHistory = history.filter(h => 
- h.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
- h.content.some(s => s.script.toLowerCase().includes(searchTerm.toLowerCase()))
- );
+ const filteredHistory = history.filter(h => {
+   if (!h.title) return false;
+   const titleMatch = h.title.toLowerCase().includes(searchTerm.toLowerCase());
+   
+   let contentMatch = false;
+   if (Array.isArray(h.content)) {
+     contentMatch = h.content.some(s => s.script && s.script.toLowerCase().includes(searchTerm.toLowerCase()));
+   } else if (h.content && typeof h.content === 'object') {
+      // Handle evaluation results
+      const evalContent = h.content as any;
+      contentMatch = (evalContent.storytellingRewrite && evalContent.storytellingRewrite.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                     (evalContent.hookAnalysis && evalContent.hookAnalysis.toLowerCase().includes(searchTerm.toLowerCase()));
+   }
+
+   return titleMatch || contentMatch;
+ });
 
  const copyToClipboard = (text: string) => {
  navigator.clipboard.writeText(text);
@@ -53,44 +87,69 @@ export default function ScriptHistoryView() {
   titleEl.style.fontSize = '24px';
   container.appendChild(titleEl);
   
-  script.content.forEach((item, index) => {
+  if (Array.isArray(script.content)) {
+    script.content.forEach((item, index) => {
+      const scriptContainer = document.createElement('div');
+      scriptContainer.style.marginBottom = '40px';
+      scriptContainer.style.pageBreakInside = 'avoid';
+      
+      const scriptTitle = document.createElement('h2');
+      scriptTitle.textContent = `النتيجة ${index + 1}: ${item.title}`;
+      scriptTitle.style.fontSize = '18px';
+      scriptTitle.style.marginBottom = '15px';
+      scriptTitle.style.color = '#0a0a0a';
+      scriptContainer.appendChild(scriptTitle);
+      
+      const scriptContent = document.createElement('div');
+      scriptContent.textContent = item.script;
+      scriptContent.style.whiteSpace = 'pre-wrap';
+      scriptContent.style.fontSize = '14px';
+      scriptContent.style.lineHeight = '1.6';
+      scriptContent.style.marginBottom = '20px';
+      scriptContainer.appendChild(scriptContent);
+      
+      if (options.includeScenes && item.sceneAnalysis) {
+        const sceneTitle = document.createElement('h3');
+        sceneTitle.textContent = 'تحليل المشاهد:';
+        sceneTitle.style.fontSize = '14px';
+        sceneTitle.style.marginTop = '15px';
+        sceneTitle.style.color = '#4a4a4a';
+        scriptContainer.appendChild(sceneTitle);
+        
+        const sceneContent = document.createElement('div');
+        sceneContent.textContent = item.sceneAnalysis;
+        sceneContent.style.whiteSpace = 'pre-wrap';
+        sceneContent.style.fontSize = '12px';
+        sceneContent.style.color = '#4a4a4a';
+        scriptContainer.appendChild(sceneContent);
+      }
+      
+      container.appendChild(scriptContainer);
+    });
+  } else {
+    // Handle evaluation result
+    const evalContent = script.content as any;
     const scriptContainer = document.createElement('div');
     scriptContainer.style.marginBottom = '40px';
     scriptContainer.style.pageBreakInside = 'avoid';
     
     const scriptTitle = document.createElement('h2');
-    scriptTitle.textContent = `النتيجة ${index + 1}: ${item.title}`;
+    scriptTitle.textContent = `إعادة الكتابة`;
     scriptTitle.style.fontSize = '18px';
     scriptTitle.style.marginBottom = '15px';
     scriptTitle.style.color = '#0a0a0a';
     scriptContainer.appendChild(scriptTitle);
     
-    const scriptContent = document.createElement('div');
-    scriptContent.textContent = item.script;
-    scriptContent.style.whiteSpace = 'pre-wrap';
-    scriptContent.style.fontSize = '14px';
-    scriptContent.style.lineHeight = '1.6';
-    scriptContent.style.marginBottom = '20px';
-    scriptContainer.appendChild(scriptContent);
-    
-    if (options.includeScenes && item.sceneAnalysis) {
-      const sceneTitle = document.createElement('h3');
-      sceneTitle.textContent = 'تحليل المشاهد:';
-      sceneTitle.style.fontSize = '14px';
-      sceneTitle.style.marginTop = '15px';
-      sceneTitle.style.color = '#4a4a4a';
-      scriptContainer.appendChild(sceneTitle);
-      
-      const sceneContent = document.createElement('div');
-      sceneContent.textContent = item.sceneAnalysis;
-      sceneContent.style.whiteSpace = 'pre-wrap';
-      sceneContent.style.fontSize = '12px';
-      sceneContent.style.color = '#4a4a4a';
-      scriptContainer.appendChild(sceneContent);
-    }
-    
+    const scriptText = document.createElement('div');
+    scriptText.textContent = evalContent.storytellingRewrite;
+    scriptText.style.whiteSpace = 'pre-wrap';
+    scriptText.style.fontSize = '14px';
+    scriptText.style.lineHeight = '1.6';
+    scriptText.style.marginBottom = '20px';
+    scriptContainer.appendChild(scriptText);
+
     container.appendChild(scriptContainer);
-  });
+  }
   
   document.body.appendChild(container);
   
@@ -146,7 +205,9 @@ export default function ScriptHistoryView() {
  {new Date(item.created_at).toLocaleDateString('ar-EG')}
  </span>
  </div>
- <p className="text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">{item.content[0].script}</p>
+ <p className="text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+   {Array.isArray(item.content) ? item.content[0]?.script : (item.content as any)?.storytellingRewrite}
+ </p>
  </button>
  ))}
  {filteredHistory.length === 0 && (
@@ -184,7 +245,7 @@ export default function ScriptHistoryView() {
  </div>
 
  <div className="p-6 space-y-8 max-h-[600px] overflow-y-auto custom-scrollbar">
- {selectedScript.content.map((result, idx) => (
+ {Array.isArray(selectedScript.content) ? selectedScript.content.map((result, idx) => (
  <div key={idx} className="space-y-4 pb-8 border-b border-[var(--border-color)] last:border-0">
  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
  <h4 className="font-bold text-[#EFFF04] flex items-center gap-2">
@@ -241,7 +302,31 @@ export default function ScriptHistoryView() {
  ) : null}
  </div>
  </div>
- ))}
+ )) : (
+   <div className="space-y-4 pb-8 border-b border-[var(--border-color)] last:border-0">
+     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+       <h4 className="font-bold text-[#EFFF04] flex items-center gap-2">
+         <CheckCircle2 className="w-5 h-5" />
+         إعادة الكتابة
+       </h4>
+       <div className="flex gap-2 w-full sm:w-auto">
+         <button
+           onClick={() => copyToClipboard((selectedScript.content as any).storytellingRewrite)}
+           className="flex-1 sm:flex-none text-xs px-3 py-2 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-lg hover:bg-[var(--border-color)] flex items-center justify-center gap-1 font-medium transition-colors border border-[var(--border-color)]"
+         >
+           <Copy className="w-3 h-3" /> نسخة الاسكربت
+         </button>
+       </div>
+     </div>
+     <div className="grid grid-cols-1 gap-4">
+       <div className="space-y-4">
+         <div className="bg-[var(--bg-tertiary)] p-5 rounded-xl border border-[var(--border-color)] text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">
+           {(selectedScript.content as any).storytellingRewrite}
+         </div>
+       </div>
+     </div>
+   </div>
+ )}
  </div>
  </motion.div>
  ) : (

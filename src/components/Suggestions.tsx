@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, Link as LinkIcon, File as FileIcon, CheckCircle, XCircle, User as UserIcon, Phone, Mail, Search, Plus, Trash2, Calendar, ArrowRight } from 'lucide-react';
-import { User, Suggestion } from '../types';
+import { User, Suggestion, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, collection, query, getDocs, orderBy, addDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface SuggestionsProps {
   user: User;
   isEnglish: boolean;
   isAdmin?: boolean;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function Suggestions({ user, isEnglish, isAdmin = false }: SuggestionsProps) {
+export default function Suggestions({ user, isEnglish, isAdmin = false, config, onSelectElement }: SuggestionsProps) {
   const t = isEnglish ? translations.en : translations.ar;
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
+
   const [content, setContent] = useState('');
   const [links, setLinks] = useState<string[]>(['']);
   const [files, setFiles] = useState<{ name: string, data: string }[]>([]);
@@ -30,13 +45,13 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
   const fetchSuggestions = async () => {
     setFetching(true);
     try {
-      const res = await fetch('/api/admin/suggestions');
-      if (res.ok) {
-        const data = await res.json();
-        setSuggestions(data);
-      }
+      const q = query(collection(db, 'suggestions'), orderBy('created_at', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Suggestion[];
+      setSuggestions(data);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'suggestions');
     } finally {
       setFetching(false);
     }
@@ -63,26 +78,24 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content,
-          links: links.filter(l => l.trim()),
-          files
-        }),
+      await addDoc(collection(db, 'suggestions'), {
+        user_id: user.id,
+        user_name: user.name,
+        user_email: user.email,
+        user_phone: user.phone,
+        content,
+        links: links.filter(l => l.trim()),
+        files,
+        created_at: new Date().toISOString()
       });
-      if (res.ok) {
-        setMessage({ type: 'success', text: t.saveSuccess });
-        setContent('');
-        setLinks(['']);
-        setFiles([]);
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || t.error });
-      }
+      setMessage({ type: 'success', text: t.saveSuccess });
+      setContent('');
+      setLinks(['']);
+      setFiles([]);
     } catch (err) {
+      console.error(err);
       setMessage({ type: 'error', text: t.error });
+      handleFirestoreError(err, OperationType.CREATE, 'suggestions');
     } finally {
       setLoading(false);
     }
@@ -111,11 +124,13 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
             <input
               type="text"
               placeholder={t.search}
-              className="input-field py-4 pl-12 pr-6 text-lg"
+              className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'} text-lg`}
               value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dim group-focus-within:text-brand-primary transition-colors" />
+            <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors`}>
+              <Search className="w-5 h-5" />
+            </div>
           </div>
         </div>
 
@@ -220,8 +235,18 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
         animate={{ opacity: 1, y: 0 }}
         className="text-center space-y-4"
       >
-        <h2 className="text-5xl font-black text-white uppercase tracking-tight">{t.suggestions}</h2>
-        <p className="text-xl text-dim font-bold tracking-wide">شاركنا أفكارك لتحسين المنصة</p>
+        <h2 
+          {...getEditableProps('pages.suggestions.title', 'text', 'Suggestions Page Title')}
+          className="text-5xl font-black text-white uppercase tracking-tight"
+        >
+          {config?.pages?.suggestions?.title || t.suggestions}
+        </h2>
+        <p 
+          {...getEditableProps('pages.suggestions.subtitle', 'text', 'Suggestions Page Subtitle')}
+          className="text-xl text-dim font-bold tracking-wide"
+        >
+          {config?.pages?.suggestions?.subtitle || (isEnglish ? 'Help us improve by sharing your thoughts and ideas.' : 'شاركنا أفكارك لتحسين المنصة')}
+        </p>
       </motion.div>
 
       <AnimatePresence>
@@ -265,9 +290,12 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
             {links.map((link, idx) => (
               <div key={idx} className="flex gap-4">
                 <div className="relative flex-1 group">
+                  <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+                    <LinkIcon className="w-5 h-5" />
+                  </div>
                   <input
                     type="url"
-                    className="input-field py-4 pl-12"
+                    className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'}`}
                     value={link || ''}
                     onChange={(e) => {
                       const newLinks = [...links];
@@ -277,7 +305,6 @@ export default function Suggestions({ user, isEnglish, isAdmin = false }: Sugges
                     placeholder="https://..."
                     disabled={user.status === 'frozen'}
                   />
-                  <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dim group-focus-within:text-brand-primary transition-colors" />
                 </div>
                 {idx === links.length - 1 && (
                   <button

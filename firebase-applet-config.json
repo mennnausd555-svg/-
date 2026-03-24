@@ -1,0 +1,10 @@
+{
+  "projectId": "vairal-ai",
+  "appId": "1:225482085646:web:6bc02d847a581b2374335f",
+  "apiKey": "AIzaSyBIN7fjezgzsunbEcIpkBIxvrsoytM2iTw",
+  "authDomain": "vairal-ai.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-3096c370-416a-47f6-9afb-8e6e060d541c",
+  "storageBucket": "vairal-ai.firebasestorage.app",
+  "messagingSenderId": "225482085646",
+  "measurementId": ""
+}

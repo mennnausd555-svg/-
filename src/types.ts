@@ -15,33 +15,35 @@ export interface ScriptResult {
 }
 
 export interface User {
-  id: number;
+  id: string;
   name: string;
   username: string;
   email: string;
   phone: string;
   password?: string; // Admin might see this
   plain_password?: string;
-  role: 'user' | 'manager';
+  role: 'user' | 'manager' | 'admin';
   status: 'pending' | 'active' | 'suspended' | 'frozen';
   expires_at: string;
   usage_limit: number;
   initial_limit: number;
   usage_period: 'daily' | 'weekly' | 'monthly';
+  subscription_status?: 'normal' | 'premium';
   profile_pic?: string;
   social_links?: string; // JSON string
   created_at: string;
 }
 
 export interface ScriptHistory {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   user_name?: string;
   user_email?: string;
   title: string;
   inputs: any; // Parsed JSON
   content: ScriptResult[]; // Parsed JSON
   is_saved: number;
+  video_link?: string;
   created_at: string;
 }
 
@@ -58,25 +60,23 @@ export interface SiteConfig {
     text: string;
     dim: string;
   };
-  sections: Array<{
-    id: string;
-    type: 'hero' | 'features' | 'bento' | 'cta' | 'footer';
-    title: string;
-    subtitle?: string;
-    content?: any;
-    styles?: {
-      titleColor?: string;
-      titleSize?: string;
-      titleAlign?: 'left' | 'center' | 'right';
-      bgColor?: string;
+  pages: {
+    landing: {
+      hero: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+      features: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+      cta: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
     };
-    visible: boolean;
-  }>;
+    formats: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    freeGeneration: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    textLab: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    archive: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+  };
+  landingContent?: any;
 }
 
 export interface Suggestion {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   user_name?: string;
   user_email?: string;
   user_phone?: string;

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle2, XCircle, Sparkles, Brain, Heart, Lightbulb, CheckCircle, Languages, FileText, AlertCircle } from 'lucide-react';
 import { evaluateScript } from '../services/gemini';
-import { EvaluationResult, Dialect, User } from '../types';
+import { EvaluationResult, Dialect, User, SiteConfig } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from '../translations';
+import { db, collection, addDoc, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
 const DIALECTS: Dialect[] = [
   'اللهجة المصرية',
@@ -18,18 +19,31 @@ const DIALECTS: Dialect[] = [
 interface EvaluationSectionProps {
   isEnglish: boolean;
   user: User;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function EvaluationSection({ isEnglish, user }: EvaluationSectionProps) {
+export default function EvaluationSection({ isEnglish, user, config, onSelectElement }: EvaluationSectionProps) {
   const [script, setScript] = useState('');
   const [dialect, setDialect] = useState<Dialect>(DIALECTS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<EvaluationResult | null>(null);
-  const [scriptId, setScriptId] = useState<number | null>(null);
+  const [scriptId, setScriptId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [lastGenerationTime, setLastGenerationTime] = useState<number | null>(null);
   const t = isEnglish ? translations.en : translations.ar;
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
 
   useEffect(() => {
     let interval: any;
@@ -55,32 +69,36 @@ export default function EvaluationSection({ isEnglish, user }: EvaluationSection
     setScriptId(null);
     try {
       // Check limits
-      const limitRes = await fetch('/api/check-limits');
-      if (!limitRes.ok) {
-        const errorData = await limitRes.json();
-        throw new Error(errorData.error || (isEnglish ? 'Failed to verify permissions' : 'فشل التحقق من الصلاحيات'));
+      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit <= 0) {
+        throw new Error(isEnglish ? 'Usage limit exceeded. Please upgrade your subscription.' : 'لقد استنفدت الحد المسموح لك. يرجى ترقية اشتراكك.');
       }
 
       const evaluation = await evaluateScript(script, dialect);
       setResult(evaluation);
 
-      // Save to history
+      // Save to history and decrement limit
       try {
-        const saveRes = await fetch('/api/scripts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: isEnglish ? 'Script Evaluation' : 'تقييم اسكربت',
-            content: evaluation,
-            inputs: { script, dialect }
-          })
+        const docRef = await addDoc(collection(db, 'scripts'), {
+          user_id: user.id,
+          title: isEnglish ? 'Script Evaluation' : 'تقييم اسكربت',
+          content: JSON.stringify(evaluation),
+          inputs: JSON.stringify({ script, dialect }),
+          type: 'evaluation',
+          is_saved: false,
+          is_filmed: false,
+          created_at: new Date().toISOString()
         });
-        if (saveRes.ok) {
-          const saveData = await saveRes.json();
-          setScriptId(saveData.id);
+        setScriptId(docRef.id);
+
+        // Decrement user limit
+        if (user.role !== 'admin' && user.role !== 'manager') {
+          await updateDoc(doc(db, 'users', user.id), {
+            usage_limit: user.usage_limit - 1
+          });
         }
       } catch (saveErr) {
         console.error('Failed to save evaluation:', saveErr);
+        handleFirestoreError(saveErr, OperationType.CREATE, 'scripts');
       }
     } catch (err: any) {
       setError(err.message || (isEnglish ? 'An error occurred during evaluation' : 'حدث خطأ أثناء التقييم'));
@@ -92,16 +110,13 @@ export default function EvaluationSection({ isEnglish, user }: EvaluationSection
   const handleSave = async () => {
     if (!scriptId) return;
     try {
-      const res = await fetch(`/api/scripts/${scriptId}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_saved: true })
+      await updateDoc(doc(db, 'scripts', scriptId), {
+        is_saved: true
       });
-      if (res.ok) {
-        alert(isEnglish ? 'Evaluation saved successfully' : 'تم حفظ التقييم بنجاح');
-      }
+      alert(isEnglish ? 'Evaluation saved successfully' : 'تم حفظ التقييم بنجاح');
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `scripts/${scriptId}`);
     }
   };
 
@@ -113,11 +128,19 @@ export default function EvaluationSection({ isEnglish, user }: EvaluationSection
             <CheckCircle className="w-8 h-8 text-brand-primary" />
           </div>
           <div>
-            <h2 className="text-4xl font-black text-white tracking-tight mb-3">{t.evaluate}</h2>
-            <p className="text-dim text-xl max-w-2xl leading-relaxed font-medium">
-              {isEnglish 
+            <h2 
+              {...getEditableProps('pages.textLab.title', 'text', 'Text Lab Page Title')}
+              className="text-4xl font-black text-white tracking-tight mb-3"
+            >
+              {config?.pages?.textLab?.title || t.evaluate}
+            </h2>
+            <p 
+              {...getEditableProps('pages.textLab.subtitle', 'text', 'Text Lab Page Subtitle')}
+              className="text-dim text-xl max-w-2xl leading-relaxed font-medium"
+            >
+              {config?.pages?.textLab?.subtitle || (isEnglish 
                 ? 'Submit your script for a deep narrative audit based on viral retention psychology.' 
-                : 'ضع الاسكربت الخاص بك هنا وسنقوم بتقييمه بناءً على عوامل نجاح الفيديوهات الفايرال.'}
+                : 'ضع الاسكربت الخاص بك هنا وسنقوم بتقييمه بناءً على عوامل نجاح الفيديوهات الفايرال.')}
             </p>
           </div>
         </div>

@@ -1,8 +1,24 @@
 import { GoogleGenAI, Type, Schema } from '@google/genai';
 import { ScriptResult, EvaluationResult, FileData } from '../types';
+import { db, doc, getDoc } from '../firebase';
 
-// Initialize the Gemini client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize the Gemini client with default key
+let ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'default-key' });
+
+async function getGeminiClient() {
+  try {
+    const settingsDoc = await getDoc(doc(db, 'settings', 'app_settings'));
+    if (settingsDoc.exists()) {
+      const data = settingsDoc.data();
+      if (data.gemini_api_key) {
+        return new GoogleGenAI({ apiKey: data.gemini_api_key });
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching custom Gemini API key:', err);
+  }
+  return ai;
+}
 
 const SYSTEM_INSTRUCTION = `أنت خبير عالمي في كتابة وتقييم اسكربتات الفيديوهات الفايرال (القصيرة والطويلة).
 يجب أن تلتزم التزاماً تاماً بالقواعد التالية المستمدة من ملفات التدريب:
@@ -121,8 +137,10 @@ export async function generateScripts(
     },
   };
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+  const currentAi = await getGeminiClient();
+
+  const response = await currentAi.models.generateContent({
+    model: 'gemini-2.5-flash',
     contents: { parts },
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -130,6 +148,11 @@ export async function generateScripts(
       responseSchema: responseSchema,
       temperature: 0.7,
     },
+  }).catch((error: any) => {
+    if (error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error('لقد تجاوزت الحد المسموح به من الطلبات. يرجى الانتظار قليلاً أو المحاولة لاحقاً.');
+    }
+    throw error;
   });
 
   let text = response.text;
@@ -185,8 +208,10 @@ export async function evaluateScript(
     required: ['hasHook', 'hookAnalysis', 'suggestedHooks', 'hasPayoff', 'payoffAnalysis', 'openLoopsAnalysis', 'emotionsAnalysis', 'storytellingRewrite'],
   };
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+  const currentAi = await getGeminiClient();
+
+  const response = await currentAi.models.generateContent({
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -194,6 +219,11 @@ export async function evaluateScript(
       responseSchema: responseSchema,
       temperature: 0.7,
     },
+  }).catch((error: any) => {
+    if (error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error('لقد تجاوزت الحد المسموح به من الطلبات. يرجى الانتظار قليلاً أو المحاولة لاحقاً.');
+    }
+    throw error;
   });
 
   let text = response.text;

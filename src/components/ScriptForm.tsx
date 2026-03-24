@@ -158,7 +158,7 @@ export default function ScriptForm({ isFormatMode, onSubmit, isLoading, isEnglis
                 <select
                   value={format || ''}
                   onChange={(e) => setFormat(e.target.value)}
-                  className="input-field appearance-none cursor-pointer pr-12"
+                  className="input-field appearance-none cursor-pointer !pr-12"
                 >
                   {FORMATS.map((f) => (
                     <option key={f} value={f}>{f}</option>
@@ -269,7 +269,7 @@ export default function ScriptForm({ isFormatMode, onSubmit, isLoading, isEnglis
                 <select
                   value={minutes || ''}
                   onChange={(e) => setMinutes(e.target.value)}
-                  className="input-field appearance-none cursor-pointer pr-12"
+                  className="input-field appearance-none cursor-pointer !pr-12"
                 >
                   {Array.from({ length: 50 }, (_, i) => i + 1).map(num => (
                     <option key={num} value={num}>{num} {isEnglish ? 'Minutes' : 'دقائق'}</option>
@@ -294,7 +294,7 @@ export default function ScriptForm({ isFormatMode, onSubmit, isLoading, isEnglis
             <select
               value={curiosityLevel || ''}
               onChange={(e) => setCuriosityLevel(e.target.value)}
-              className="input-field appearance-none cursor-pointer pr-12"
+              className="input-field appearance-none cursor-pointer !pr-12"
             >
               {(isEnglish ? CURIOSITY_LEVELS_EN : CURIOSITY_LEVELS_AR).map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -315,7 +315,7 @@ export default function ScriptForm({ isFormatMode, onSubmit, isLoading, isEnglis
             <select
               value={emotion || ''}
               onChange={(e) => setEmotion(e.target.value)}
-              className="input-field appearance-none cursor-pointer pr-12"
+              className="input-field appearance-none cursor-pointer !pr-12"
             >
               {(isEnglish ? EMOTIONS_EN : EMOTIONS_AR).map((e) => (
                 <option key={e} value={e}>{e}</option>
@@ -336,7 +336,7 @@ export default function ScriptForm({ isFormatMode, onSubmit, isLoading, isEnglis
             <select
               value={dialect || ''}
               onChange={(e) => setDialect(e.target.value as Dialect)}
-              className="input-field appearance-none cursor-pointer pr-12"
+              className="input-field appearance-none cursor-pointer !pr-12"
             >
               {(isEnglish ? DIALECTS_EN : DIALECTS_AR).map((d, idx) => (
                 <option key={idx} value={DIALECTS_AR[idx]}>{d}</option>

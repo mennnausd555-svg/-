@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Bookmark, Search, FileText, User as UserIcon, Mail, Phone, ExternalLink, X, Calendar, ArrowRight } from 'lucide-react';
+import { Star, Search, FileText, User as UserIcon, Mail, Phone, ExternalLink, X, Calendar, ArrowRight, CheckSquare, FileDown } from 'lucide-react';
 import { ScriptHistory, User } from '../types';
 import { translations } from '../translations';
 import ScriptResults from './ScriptResults';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, collection, query, where, getDocs, handleFirestoreError, OperationType } from '../firebase';
 
 interface SavedScriptsProps {
   user: User;
@@ -17,22 +18,145 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false }: Saved
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedScript, setSelectedScript] = useState<ScriptHistory | null>(null);
+  const [selectedScripts, setSelectedScripts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchScripts();
   }, [isAdmin]);
 
+  const toggleSelectScript = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedScripts);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedScripts(newSelected);
+  };
+
+  const exportToPDF = async () => {
+    if (selectedScripts.size === 0) {
+      alert(isEnglish ? 'Please select at least one script to download' : 'يجب عليك أن تختار اسكربتات أولاً لتتمكن من تحميلها');
+      return;
+    }
+
+    const scriptsToExport = scripts.filter(s => selectedScripts.has(s.id));
+    const pdfTitle = isEnglish ? 'Starred Scripts' : 'الاسكربتات المميزة بنجمة';
+    
+    const container = document.createElement('div');
+    container.style.padding = '40px';
+    container.style.fontFamily = 'Arial, Tahoma, sans-serif';
+    container.style.color = '#000';
+    container.style.backgroundColor = '#fff';
+    container.dir = isEnglish ? 'ltr' : 'rtl';
+    
+    const titleEl = document.createElement('h1');
+    titleEl.textContent = pdfTitle;
+    titleEl.style.textAlign = 'center';
+    titleEl.style.marginBottom = '30px';
+    titleEl.style.fontSize = '24px';
+    container.appendChild(titleEl);
+    
+    scriptsToExport.forEach((script, i) => {
+      const scriptContainer = document.createElement('div');
+      scriptContainer.style.marginBottom = '40px';
+      scriptContainer.style.pageBreakInside = 'avoid';
+      
+      const scriptTitle = document.createElement('h2');
+      scriptTitle.textContent = `${i + 1}. ${script.title}`;
+      scriptTitle.style.fontSize = '18px';
+      scriptTitle.style.marginBottom = '15px';
+      scriptTitle.style.color = '#0a0a0a';
+      scriptContainer.appendChild(scriptTitle);
+      
+      const scriptContent = document.createElement('div');
+      
+      if (Array.isArray(script.content)) {
+        script.content.forEach((c, idx) => {
+          const resultContainer = document.createElement('div');
+          resultContainer.style.marginBottom = '20px';
+          
+          const resultTitle = document.createElement('h3');
+          resultTitle.textContent = c.title || `Result ${idx + 1}`;
+          resultTitle.style.fontSize = '16px';
+          resultTitle.style.marginBottom = '10px';
+          resultTitle.style.color = '#333';
+          resultContainer.appendChild(resultTitle);
+          
+          const textContent = document.createElement('div');
+          textContent.textContent = c.script;
+          textContent.style.whiteSpace = 'pre-wrap';
+          textContent.style.fontSize = '14px';
+          textContent.style.lineHeight = '1.6';
+          textContent.style.marginBottom = '15px';
+          resultContainer.appendChild(textContent);
+          
+          if (c.sceneAnalysis) {
+            const sceneTitle = document.createElement('h4');
+            sceneTitle.textContent = isEnglish ? 'Visual Direction:' : 'تحليل المشاهد:';
+            sceneTitle.style.fontSize = '14px';
+            sceneTitle.style.marginTop = '10px';
+            sceneTitle.style.color = '#555';
+            resultContainer.appendChild(sceneTitle);
+            
+            const sceneContent = document.createElement('div');
+            sceneContent.textContent = c.sceneAnalysis;
+            sceneContent.style.whiteSpace = 'pre-wrap';
+            sceneContent.style.fontSize = '12px';
+            sceneContent.style.color = '#555';
+            resultContainer.appendChild(sceneContent);
+          }
+          
+          scriptContent.appendChild(resultContainer);
+        });
+      } else {
+        scriptContent.textContent = typeof script.content === 'string' ? script.content : JSON.stringify(script.content);
+        scriptContent.style.whiteSpace = 'pre-wrap';
+        scriptContent.style.fontSize = '14px';
+        scriptContent.style.lineHeight = '1.6';
+      }
+      
+      scriptContainer.appendChild(scriptContent);
+      
+      container.appendChild(scriptContainer);
+    });
+    
+    document.body.appendChild(container);
+    
+    try {
+      // @ts-ignore
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf().from(container).set({
+        margin: 10,
+        filename: `${pdfTitle}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).save();
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert(isEnglish ? 'Failed to generate PDF. Please try again.' : 'فشل في إنشاء ملف PDF. يرجى المحاولة مرة أخرى.');
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
   const fetchScripts = async () => {
     setLoading(true);
     try {
-      const endpoint = isAdmin ? '/api/admin/saved-scripts' : '/api/scripts/saved';
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setScripts(data);
+      let q;
+      if (isAdmin) {
+        q = query(collection(db, 'scripts'), where('is_saved', '==', true));
+      } else {
+        q = query(collection(db, 'scripts'), where('user_id', '==', user.id), where('is_saved', '==', true));
       }
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any })) as ScriptHistory[];
+      setScripts(data);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'scripts');
     } finally {
       setLoading(false);
     }
@@ -59,7 +183,7 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false }: Saved
         <div className="space-y-2">
           <h2 className="text-4xl font-black flex items-center gap-4 text-white uppercase tracking-tight">
             <div className="w-12 h-12 bg-brand-primary/10 rounded-2xl flex items-center justify-center border border-brand-primary/20 shadow-[0_0_30px_rgba(0,102,255,0.1)]">
-              <Bookmark className="w-6 h-6 text-brand-primary" />
+              <Star className="w-6 h-6 text-brand-primary" />
             </div>
             {t.savedScripts}
           </h2>
@@ -69,12 +193,45 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false }: Saved
           <input
             type="text"
             placeholder={t.search}
-            className="input-field py-4 pl-12 pr-6 text-lg"
+            className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'} text-lg`}
             value={searchTerm || ''}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dim group-focus-within:text-brand-primary transition-colors" />
+          <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors`}>
+            <Search className="w-5 h-5" />
+          </div>
         </div>
+      </div>
+
+      <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => {
+              if (selectedScripts.size === filteredScripts.length) {
+                setSelectedScripts(new Set());
+              } else {
+                setSelectedScripts(new Set(filteredScripts.map(s => s.id)));
+              }
+            }}
+            className="flex items-center gap-2 text-sm font-bold text-dim hover:text-white transition-colors"
+          >
+            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${selectedScripts.size === filteredScripts.length && filteredScripts.length > 0 ? 'bg-brand-primary border-brand-primary text-white' : 'border-white/20'}`}>
+              {selectedScripts.size === filteredScripts.length && filteredScripts.length > 0 && <CheckSquare className="w-3 h-3" />}
+            </div>
+            {isEnglish ? 'Select All' : 'تحديد الكل'}
+          </button>
+          <span className="text-xs font-bold text-dim bg-white/5 px-3 py-1 rounded-full">
+            {selectedScripts.size} {isEnglish ? 'Selected' : 'محدد'}
+          </span>
+        </div>
+        <button
+          onClick={exportToPDF}
+          disabled={selectedScripts.size === 0}
+          className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${selectedScripts.size > 0 ? 'bg-brand-primary text-white hover:shadow-[0_0_20px_rgba(0,102,255,0.3)]' : 'bg-white/5 text-dim cursor-not-allowed'}`}
+        >
+          <FileDown className="w-4 h-4" />
+          {isEnglish ? 'Download PDF' : 'تحميل PDF'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -91,8 +248,16 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false }: Saved
               <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-[40px] group-hover:bg-brand-primary/10 transition-colors" />
               <div className="p-8 space-y-6 relative z-10">
                 <div className="flex justify-between items-start">
-                  <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center text-brand-primary border border-brand-primary/20 group-hover:scale-110 transition-transform duration-500">
-                    <FileText className="w-7 h-7" />
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={(e) => toggleSelectScript(script.id, e)}
+                      className={`w-6 h-6 rounded flex items-center justify-center border transition-colors ${selectedScripts.has(script.id) ? 'bg-brand-primary border-brand-primary text-white' : 'border-white/20 hover:border-brand-primary/50 bg-deep/50'}`}
+                    >
+                      {selectedScripts.has(script.id) && <CheckSquare className="w-4 h-4" />}
+                    </button>
+                    <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center text-brand-primary border border-brand-primary/20 group-hover:scale-110 transition-transform duration-500">
+                      <FileText className="w-7 h-7" />
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-[10px] font-black text-dim uppercase tracking-[0.2em]">
@@ -141,7 +306,7 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false }: Saved
           className="text-center py-32 glass-card rounded-[3rem] border border-white/5"
         >
           <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-8">
-            <Bookmark className="w-12 h-12 text-dim/20" />
+            <Star className="w-12 h-12 text-dim/20" />
           </div>
           <p className="text-dim font-black uppercase tracking-[0.3em] text-sm">{t.noScripts}</p>
         </motion.div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, ChevronDown, ChevronUp, Sparkles, Zap, Shield, HelpCircle, CreditCard, MessageCircle, AlertTriangle } from 'lucide-react';
@@ -7,10 +7,24 @@ import { CheckCircle2, ChevronDown, ChevronUp, Sparkles, Zap, Shield, HelpCircle
 interface SubscriptionProps {
   user: User;
   isEnglish: boolean;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function Subscription({ user, isEnglish }: SubscriptionProps) {
+export default function Subscription({ user, isEnglish, config, onSelectElement }: SubscriptionProps) {
   const t = isEnglish ? translations.en : translations.ar;
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
+
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const initialLimit = user.initial_limit || 250;
@@ -48,11 +62,19 @@ export default function Subscription({ user, isEnglish }: SubscriptionProps) {
             <CreditCard className="w-8 h-8 text-brand-primary" />
           </div>
           <div>
-            <h2 className="text-4xl font-black text-white tracking-tight mb-3">{t.subscription}</h2>
-            <p className="text-dim text-xl max-w-2xl leading-relaxed font-medium">
-              {isEnglish 
+            <h2 
+              {...getEditableProps('pages.subscription.title', 'text', 'Subscription Page Title')}
+              className="text-4xl font-black text-white tracking-tight mb-3"
+            >
+              {config?.pages?.subscription?.title || t.subscription}
+            </h2>
+            <p 
+              {...getEditableProps('pages.subscription.subtitle', 'text', 'Subscription Page Subtitle')}
+              className="text-dim text-xl max-w-2xl leading-relaxed font-medium"
+            >
+              {config?.pages?.subscription?.subtitle || (isEnglish 
                 ? 'Manage your credits and subscription plan to keep your viral engine running.' 
-                : 'إدارة رصيدك وخطة اشتراكك للحفاظ على استمرارية محرك الفايرال الخاص بك.'}
+                : 'إدارة رصيدك وخطة اشتراكك للحفاظ على استمرارية محرك الفايرال الخاص بك.')}
             </p>
           </div>
         </div>

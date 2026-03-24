@@ -1,22 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { User, ScriptHistory } from '../types';
+import { User, ScriptHistory, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
 import { Video, Link as LinkIcon, Plus, CheckCircle2, MessageCircle, ExternalLink, Trash2, Search, X, Wand2 } from 'lucide-react';
+import { db, collection, query, where, getDocs, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface FilmedScriptsProps {
   user: User;
   isEnglish: boolean;
   isAdmin?: boolean;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScriptsProps) {
+export default function FilmedScripts({ user, isEnglish, isAdmin, config, onSelectElement }: FilmedScriptsProps) {
   const t = isEnglish ? translations.en : translations.ar;
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
+
   const [scripts, setScripts] = useState<any[]>([]);
   const [availableScripts, setAvailableScripts] = useState<ScriptHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedScriptId, setSelectedScriptId] = useState<number | null>(null);
+  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
   const [videoLink, setVideoLink] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -29,14 +44,18 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
 
   const fetchFilmedScripts = async () => {
     try {
-      const endpoint = isAdmin ? '/api/admin/filmed' : '/api/scripts/filmed';
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setScripts(data);
+      let q;
+      if (isAdmin) {
+        q = query(collection(db, 'scripts'), where('video_link', '!=', null));
+      } else {
+        q = query(collection(db, 'scripts'), where('user_id', '==', user.id), where('video_link', '!=', null));
       }
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      setScripts(data);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'scripts');
     } finally {
       setLoading(false);
     }
@@ -44,29 +63,16 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
 
   const fetchAvailableScripts = async () => {
     try {
-      const [savedRes, historyRes] = await Promise.all([
-        fetch('/api/scripts/saved'),
-        fetch('/api/scripts')
-      ]);
+      const q = query(collection(db, 'scripts'), where('user_id', '==', user.id));
+      const querySnapshot = await getDocs(q);
+      const allScripts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any })) as ScriptHistory[];
       
-      let allScripts: ScriptHistory[] = [];
-      
-      if (savedRes.ok) {
-        const savedData = await savedRes.json();
-        allScripts = [...allScripts, ...savedData];
-      }
-      
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        // Filter out scripts that are already in savedData to avoid duplicates
-        const savedIds = new Set(allScripts.map(s => s.id));
-        const uniqueHistory = historyData.filter((h: ScriptHistory) => !savedIds.has(h.id));
-        allScripts = [...allScripts, ...uniqueHistory];
-      }
-      
-      setAvailableScripts(allScripts);
+      // Filter out scripts that already have a video_link
+      const available = allScripts.filter(s => !s.video_link);
+      setAvailableScripts(available);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'scripts');
     }
   };
 
@@ -75,21 +81,18 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
     if (!selectedScriptId || !videoLink) return;
 
     try {
-      const res = await fetch(`/api/scripts/${selectedScriptId}/film`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_link: videoLink })
+      await updateDoc(doc(db, 'scripts', selectedScriptId), {
+        video_link: videoLink
       });
 
-      if (res.ok) {
-        setIsAdding(false);
-        setVideoLink('');
-        setSelectedScriptId(null);
-        fetchFilmedScripts();
-        alert(isEnglish ? 'Video link added successfully! Contact support for bonus credits.' : 'تم إضافة رابط الفيديو بنجاح! تواصل مع الدعم للحصول على رصيد إضافي.');
-      }
+      setIsAdding(false);
+      setVideoLink('');
+      setSelectedScriptId(null);
+      fetchFilmedScripts();
+      alert(isEnglish ? 'Video link added successfully! Contact support for bonus credits.' : 'تم إضافة رابط الفيديو بنجاح! تواصل مع الدعم للحصول على رصيد إضافي.');
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `scripts/${selectedScriptId}`);
     }
   };
 
@@ -168,13 +171,19 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
             <Video className="w-8 h-8 text-brand-primary" />
           </div>
           <div>
-            <h2 className="text-4xl font-black text-white tracking-tight mb-2">
-              {isAdmin ? (isEnglish ? 'Scripts Filmed' : 'اسكربتات تم تصويرها') : (isEnglish ? 'Free Balance' : 'رصيد مجاني')}
+            <h2 
+              {...getEditableProps('pages.filmedScripts.title', 'text', 'Filmed Scripts Page Title')}
+              className="text-4xl font-black text-white tracking-tight mb-2"
+            >
+              {config?.pages?.filmedScripts?.title || (isAdmin ? (isEnglish ? 'Scripts Filmed' : 'اسكربتات تم تصويرها') : (isEnglish ? 'Free Balance' : 'رصيد مجاني'))}
             </h2>
-            <p className="text-dim text-lg font-medium">
-              {isAdmin 
+            <p 
+              {...getEditableProps('pages.filmedScripts.subtitle', 'text', 'Filmed Scripts Page Subtitle')}
+              className="text-dim text-lg font-medium"
+            >
+              {config?.pages?.filmedScripts?.subtitle || (isAdmin 
                 ? (isEnglish ? 'View all filmed scripts from users' : 'عرض جميع الاسكربتات التي تم تصويرها من قبل المستخدمين')
-                : (isEnglish ? 'Log your filmed scripts to earn bonus credits' : 'سجل الاسكربتات التي قمت بتصويرها للحصول على رصيد إضافي')}
+                : (isEnglish ? 'Log your filmed scripts to earn bonus credits' : 'سجل الاسكربتات التي قمت بتصويرها للحصول على رصيد إضافي'))}
             </p>
           </div>
         </div>
@@ -205,7 +214,7 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
               </label>
               <select
                 value={selectedScriptId || ''}
-                onChange={(e) => setSelectedScriptId(Number(e.target.value))}
+                onChange={(e) => setSelectedScriptId(e.target.value)}
                 className="input-field appearance-none cursor-pointer"
                 required
               >
@@ -235,14 +244,16 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
               <label className="text-xs font-black text-dim uppercase tracking-widest px-1">
                 {isEnglish ? 'Video Link' : 'رابط الفيديو'}
               </label>
-              <div className="relative">
-                <LinkIcon className={`absolute ${isEnglish ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-5 h-5 text-dim`} />
+              <div className="relative group">
+                <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+                  <LinkIcon className="w-5 h-5" />
+                </div>
                 <input
                   type="url"
                   value={videoLink || ''}
                   onChange={(e) => setVideoLink(e.target.value)}
                   placeholder="https://tiktok.com/@user/video/..."
-                  className={`input-field ${isEnglish ? 'pl-12' : 'pr-12'}`}
+                  className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
                   required
                 />
               </div>
@@ -259,14 +270,16 @@ export default function FilmedScripts({ user, isEnglish, isAdmin }: FilmedScript
       </AnimatePresence>
 
       {isAdmin && (
-        <div className="relative">
-          <Search className={`absolute ${isEnglish ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-5 h-5 text-dim`} />
+        <div className="relative group">
+          <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+            <Search className="w-5 h-5" />
+          </div>
           <input
             type="text"
             placeholder={isEnglish ? "Search by user name, phone, or title..." : "ابحث باسم المستخدم، رقم الهاتف، أو العنوان..."}
             value={searchQuery || ''}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`input-field ${isEnglish ? 'pl-12' : 'pr-12'}`}
+            className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
           />
         </div>
       )}

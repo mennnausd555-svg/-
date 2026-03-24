@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { LayoutTemplate, Wand2, CheckCircle, History, Shield, LogOut, Moon, Sun, Languages, MessageCircle, Send, Menu, X, Bookmark, User as UserIcon, Settings, Globe, CreditCard, Video } from 'lucide-react';
+import { LayoutTemplate, Wand2, CheckCircle, History, Shield, LogOut, Moon, Sun, Languages, MessageCircle, Send, Menu, X, Star, User as UserIcon, Settings, Globe, CreditCard, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import FormatSection from './components/FormatSection';
 import FreeCreationSection from './components/FreeCreationSection';
@@ -18,41 +18,133 @@ import SavedScripts from './components/SavedScripts';
 import FilmedScripts from './components/FilmedScripts';
 import Auth from './components/Auth';
 import LandingPage from './components/LandingPage';
-import { User } from './types';
+import { User, SiteConfig } from './types';
 import { translations } from './translations';
+import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot } from './firebase';
+
+const DEFAULT_CONFIG: SiteConfig = {
+  logo: { type: 'icon', value: 'Wand2' },
+  colors: {
+    primary: '#0066FF',
+    secondary: '#8B5CF6',
+    background: '#000000',
+    surface: '#050505',
+    text: '#FFFFFF',
+    dim: '#A1A1AA'
+  },
+  pages: {
+    landing: {
+      hero: { title: 'A Script App, Not A Prompt Box.', subtitle: 'Every feature is meticulously crafted to maximize viewer retention and narrative impact.', visible: true },
+      features: { title: 'Designed for Virality', subtitle: 'Every feature is meticulously crafted to maximize viewer retention.', visible: true },
+      cta: { title: 'Ready to Viralize?', subtitle: 'Join the elite circle of creators.', visible: true }
+    },
+    formats: { title: 'Viral Formats', subtitle: 'Choose a format to start generating your script.', visible: true },
+    freeGeneration: { title: 'Free Generation', subtitle: 'Generate any script you want without a specific format.', visible: true },
+    textLab: { title: 'Text Lab', subtitle: 'Analyze and improve your scripts.', visible: true },
+    archive: { title: 'Archive', subtitle: 'View your saved scripts.', visible: true }
+  }
+};
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'formats' | 'free' | 'evaluate' | 'history' | 'admin' | 'saved' | 'suggestions' | 'profile' | 'subscription' | 'filmed' | 'all_filmed' | 'all_history' | 'all_saved' | 'all_suggestions'>('formats');
+  const [activeTab, setActiveTab] = useState<'formats' | 'free' | 'evaluate' | 'history' | 'admin' | 'saved' | 'suggestions' | 'profile' | 'subscription' | 'filmed' | 'all_filmed' | 'all_history' | 'all_saved' | 'all_suggestions'>('free');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEnglish, setIsEnglish] = useState(true);
+  const [isEnglish, setIsEnglish] = useState(false);
   const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(DEFAULT_CONFIG);
+  const [isVisualEditing, setIsVisualEditing] = useState(false);
 
   const t = isEnglish ? translations.en : translations.ar;
 
   useEffect(() => {
-    checkAuth();
+    fetchSiteConfig();
+    
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          userData.id = firebaseUser.uid;
+          setUser(userData);
+          if (userData.role === 'manager' || userData.role === 'admin' || userData.email === 'abqareno@gmail.com') setActiveTab('admin');
+        } else {
+          setUser(null);
+        }
+      } else {
+        // Check localStorage for local session
+        const localUserId = localStorage.getItem('viral_ai_user_id');
+        if (localUserId) {
+          const userDoc = await getDoc(doc(db, 'users', localUserId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            userData.id = localUserId;
+            setUser(userData);
+            if (userData.role === 'manager' || userData.role === 'admin' || userData.email === 'abqareno@gmail.com') setActiveTab('admin');
+          } else {
+            localStorage.removeItem('viral_ai_user_id');
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const checkAuth = async () => {
+  useEffect(() => {
+    if (user?.id) {
+      const unsubscribe = onSnapshot(doc(db, 'users', user.id), (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data() as User;
+          userData.id = doc.id;
+          setUser(userData);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [user?.id]);
+
+  const fetchSiteConfig = async () => {
     try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        if (data.role === 'manager') setActiveTab('admin');
+      const docRef = doc(db, 'settings', 'site_config');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const newConfig = { ...DEFAULT_CONFIG, ...JSON.parse(data.value || '{}') };
+        setSiteConfig(newConfig);
+        applyColors(newConfig.colors);
       }
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to load site config', err);
     }
   };
 
+  const applyColors = (colors: any) => {
+    const root = document.documentElement;
+    Object.entries(colors).forEach(([key, val]) => {
+      if (key === 'primary' || key === 'secondary') {
+        root.style.setProperty(`--brand-${key}`, val as string);
+      } else if (key === 'background') {
+        root.style.setProperty(`--bg-deep`, val as string);
+      } else if (key === 'surface') {
+        root.style.setProperty(`--bg-surface`, val as string);
+        root.style.setProperty(`--bg-card`, val as string);
+      } else if (key === 'text') {
+        root.style.setProperty(`--text-main`, val as string);
+      } else if (key === 'dim') {
+        root.style.setProperty(`--text-dim`, val as string);
+      }
+    });
+  };
+
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await signOut(auth);
+    localStorage.removeItem('viral_ai_user_id');
     setUser(null);
     setImpersonatedUser(null);
     setActiveTab('formats');
@@ -86,14 +178,30 @@ export default function App() {
 
   if (!user) {
     if (showAuth) {
-      return <Auth onLogin={(u) => { setUser(u); if (u.role === 'manager') setActiveTab('admin'); }} isEnglish={isEnglish} setIsEnglish={setIsEnglish} />;
+      return <Auth onLogin={(u) => { setUser(u); if (u.role === 'manager' || u.role === 'admin' || u.email === 'abqareno@gmail.com') setActiveTab('admin'); }} isEnglish={isEnglish} setIsEnglish={setIsEnglish} config={siteConfig} />;
     }
-    return <LandingPage onStart={() => setShowAuth(true)} isEnglish={isEnglish} setIsEnglish={setIsEnglish} />;
+    return <LandingPage onStart={() => setShowAuth(true)} isEnglish={isEnglish} setIsEnglish={setIsEnglish} config={siteConfig} />;
+  }
+
+  if (isVisualEditing && (user.role === 'admin' || user.role === 'manager' || user.email === 'abqareno@gmail.com')) {
+    return (
+      <div className="relative min-h-screen">
+        <LandingPage onStart={() => {}} isEnglish={isEnglish} setIsEnglish={setIsEnglish} config={siteConfig} editMode={true} />
+        <div className="fixed bottom-6 right-6 z-[100] flex gap-4">
+          <button 
+            onClick={() => setIsVisualEditing(false)}
+            className="px-6 py-3 bg-rose-500 text-white rounded-full font-bold shadow-lg hover:bg-rose-600 transition-colors"
+          >
+            {isEnglish ? 'Close Editor' : 'إغلاق المحرر'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const currentUser = impersonatedUser || user;
 
-  if (currentUser.status === 'pending' || currentUser.status === 'suspended') {
+  if ((currentUser.status === 'pending' || currentUser.status === 'suspended') && currentUser.email !== 'abqareno@gmail.com') {
     return (
       <div className="min-h-screen bg-deep flex items-center justify-center p-4" dir={isEnglish ? 'ltr' : 'rtl'}>
         <div className="glass-surface p-10 rounded-[2.5rem] border border-white/10 max-w-md w-full text-center relative overflow-hidden">
@@ -130,20 +238,20 @@ export default function App() {
   }
 
   const navItems = [
-    ...(user.role === 'manager' && !impersonatedUser ? [
+    ...((user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && !impersonatedUser ? [
       { id: 'admin', icon: Shield, label: t.adminPanel },
       { id: 'all_history', icon: History, label: t.allScriptsHistory },
-      { id: 'all_saved', icon: Bookmark, label: t.savedScripts },
+      { id: 'all_saved', icon: Star, label: t.savedScripts },
       { id: 'all_filmed', icon: Video, label: isEnglish ? 'All Filmed Scripts' : 'جميع الاسكربتات المصورة' },
       { id: 'all_suggestions', icon: MessageCircle, label: t.userSuggestions },
     ] : []),
-    ...((user.role !== 'manager' || impersonatedUser) ? [
+    ...(((user.role !== 'manager' && user.role !== 'admin' && user.email !== 'abqareno@gmail.com') || impersonatedUser) ? [
       { id: 'formats', icon: LayoutTemplate, label: t.formats },
       { id: 'free', icon: Wand2, label: t.freeCreation },
       { id: 'evaluate', icon: CheckCircle, label: t.evaluate },
       { id: 'history', icon: History, label: t.history },
       { id: 'subscription', icon: CreditCard, label: t.subscription },
-      { id: 'saved', icon: Bookmark, label: t.savedScripts },
+      { id: 'saved', icon: Star, label: t.savedScripts },
       { id: 'filmed', icon: Video, label: isEnglish ? 'Free Balance' : 'رصيد مجاني' },
       { id: 'suggestions', icon: MessageCircle, label: t.suggestions },
       { id: 'profile', icon: UserIcon, label: t.profile },
@@ -156,9 +264,13 @@ export default function App() {
       {/* Mobile Header */}
       <header className="md:hidden glass-surface sticky top-0 z-50 px-6 py-4 flex justify-between items-center border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
-            <Wand2 className="w-5 h-5 text-white" />
-          </div>
+          {siteConfig.logo.type === 'image' && siteConfig.logo.value ? (
+            <img src={siteConfig.logo.value} alt="Logo" className="h-10 object-contain" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
+              <Wand2 className="w-5 h-5 text-white" />
+            </div>
+          )}
           <h1 className="text-lg font-black tracking-tight">{t.appName}</h1>
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-dim hover:bg-white/5 rounded-lg transition-colors">
@@ -177,9 +289,13 @@ export default function App() {
             className={`fixed md:sticky top-0 ${isEnglish ? 'left-0' : 'right-0'} z-40 w-72 h-screen bg-surface border-${isEnglish ? 'r' : 'l'} border-white/5 flex flex-col shadow-2xl md:shadow-none`}
           >
             <div className="p-8 hidden md:flex items-center gap-4">
-              <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                <Wand2 className="w-6 h-6 text-white" />
-              </div>
+              {siteConfig.logo.type === 'image' && siteConfig.logo.value ? (
+                <img src={siteConfig.logo.value} alt="Logo" className="h-10 object-contain" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                  <Wand2 className="w-6 h-6 text-white" />
+                </div>
+              )}
               <h1 className="text-xl font-black tracking-tight text-white">{t.appName}</h1>
             </div>
 
@@ -200,7 +316,7 @@ export default function App() {
                 </div>
               )}
 
-              {user.role !== 'manager' && (
+              {user.role !== 'manager' && user.role !== 'admin' && (
                 <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-white/10 transition-colors" onClick={() => handleTabChange('subscription')}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30">
@@ -279,14 +395,14 @@ export default function App() {
                 {activeTab === 'filmed' && <FilmedScripts user={currentUser} isEnglish={isEnglish} />}
                 {activeTab === 'suggestions' && <Suggestions user={currentUser} isEnglish={isEnglish} />}
                 {activeTab === 'subscription' && <Subscription user={currentUser} isEnglish={isEnglish} />}
-                {activeTab === 'profile' && <Profile user={currentUser} onUpdate={checkAuth} isEnglish={isEnglish} />}
+                {activeTab === 'profile' && <Profile user={currentUser} onUpdate={() => {}} isEnglish={isEnglish} />}
                 
                 {/* Admin Tabs */}
-                {activeTab === 'admin' && user.role === 'manager' && <AdminDashboard onImpersonate={handleImpersonate} isEnglish={isEnglish} />}
-                {activeTab === 'all_history' && user.role === 'manager' && <AdminDashboard onImpersonate={handleImpersonate} isEnglish={isEnglish} defaultView="history" />}
-                {activeTab === 'all_saved' && user.role === 'manager' && <SavedScripts user={user} isEnglish={isEnglish} isAdmin={true} />}
-                {activeTab === 'all_filmed' && user.role === 'manager' && <FilmedScripts user={user} isEnglish={isEnglish} isAdmin={true} />}
-                {activeTab === 'all_suggestions' && user.role === 'manager' && <Suggestions user={user} isEnglish={isEnglish} isAdmin={true} />}
+                {activeTab === 'admin' && (user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && <AdminDashboard onImpersonate={handleImpersonate} isEnglish={isEnglish} onEditLanding={() => setIsVisualEditing(true)} />}
+                {activeTab === 'all_history' && (user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && <AdminDashboard onImpersonate={handleImpersonate} isEnglish={isEnglish} defaultView="history" onEditLanding={() => setIsVisualEditing(true)} />}
+                {activeTab === 'all_saved' && (user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && <SavedScripts user={user} isEnglish={isEnglish} isAdmin={true} />}
+                {activeTab === 'all_filmed' && (user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && <FilmedScripts user={user} isEnglish={isEnglish} isAdmin={true} />}
+                {activeTab === 'all_suggestions' && (user.role === 'manager' || user.role === 'admin' || user.email === 'abqareno@gmail.com') && <Suggestions user={user} isEnglish={isEnglish} isAdmin={true} />}
               </motion.div>
             </AnimatePresence>
           </div>

@@ -1,28 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Users, History, TrendingUp, Search, UserPlus, Shield, Ban, CheckCircle, Clock, MoreVertical, ExternalLink, Trash2, Save, X, Settings as SettingsIcon, MessageCircle, Bookmark, Eye, Lock, Unlock, Snowflake, User as UserIcon, BarChart3, Mail, Phone, Calendar, FileText, Activity, Zap, LayoutTemplate } from 'lucide-react';
+import { Users, History, TrendingUp, Search, UserPlus, Shield, Ban, CheckCircle, Clock, MoreVertical, ExternalLink, Trash2, Save, X, Settings as SettingsIcon, MessageCircle, Star, Eye, Lock, Unlock, Snowflake, User as UserIcon, BarChart3, Mail, Phone, Calendar, FileText, Activity, Zap, LayoutTemplate } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ScriptHistory, Suggestion, SiteConfig } from '../types';
 import { translations } from '../translations';
 import SiteEditor from './SiteEditor';
+import { db, collection, query, getDocs, orderBy, doc, getDoc, updateDoc, setDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface AdminDashboardProps {
   onImpersonate: (user: User) => void;
   isEnglish: boolean;
   defaultView?: 'stats' | 'users' | 'history' | 'settings' | 'suggestions';
+  onEditLanding?: () => void;
 }
 
 interface AppSettings {
   auto_activate: boolean;
   default_clicks: number;
+  gemini_api_key?: string;
 }
 
-export default function AdminDashboard({ onImpersonate, isEnglish, defaultView = 'stats' }: AdminDashboardProps) {
+export default function AdminDashboard({ onImpersonate, isEnglish, defaultView = 'stats', onEditLanding }: AdminDashboardProps) {
   const [view, setView] = useState(defaultView);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState({ totalUsers: 0, totalScripts: 0, activeToday: 0, totalSuggestions: 0 });
   const [allScripts, setAllScripts] = useState<ScriptHistory[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({ auto_activate: true, default_clicks: 10 });
+  const [settings, setSettings] = useState<AppSettings>({ auto_activate: true, default_clicks: 10, gemini_api_key: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -32,7 +35,8 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
   const [subscriptionData, setSubscriptionData] = useState({
     credits: 250,
     duration: 'monthly' as 'weekly' | 'monthly' | 'yearly',
-    initial_limit: 250
+    initial_limit: 250,
+    subscription_status: 'normal' as 'normal' | 'premium'
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [selectedScript, setSelectedScript] = useState<ScriptHistory | null>(null);
@@ -47,29 +51,65 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
     setLoading(true);
     try {
       if (view === 'stats') {
-        const res = await fetch('/api/admin/stats');
-        if (res.ok) setStats(await res.json());
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const scriptsSnap = await getDocs(collection(db, 'scripts'));
+        const suggestionsSnap = await getDocs(collection(db, 'suggestions'));
+        
+        let activeToday = 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        usersSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.last_login && new Date(data.last_login) >= today) {
+            activeToday++;
+          }
+        });
+
+        setStats({
+          totalUsers: usersSnap.size,
+          totalScripts: scriptsSnap.size,
+          activeToday: activeToday,
+          totalSuggestions: suggestionsSnap.size
+        });
       } else if (view === 'users') {
-        const res = await fetch('/api/admin/users');
-        if (res.ok) setUsers(await res.json());
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const usersData = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })) as User[];
+        setUsers(usersData);
       } else if (view === 'history') {
-        const res = await fetch('/api/admin/all-scripts');
-        if (res.ok) setAllScripts(await res.json());
+        const q = query(collection(db, 'scripts'), orderBy('created_at', 'desc'));
+        const scriptsSnap = await getDocs(q);
+        const scriptsData = scriptsSnap.docs.map(doc => {
+          const data = doc.data() as any;
+          return {
+            id: doc.id,
+            ...data,
+            content: typeof data.content === 'string' ? JSON.parse(data.content) : data.content,
+            inputs: typeof data.inputs === 'string' ? JSON.parse(data.inputs) : data.inputs,
+          };
+        }) as ScriptHistory[];
+        setAllScripts(scriptsData);
       } else if (view === 'settings') {
-        const res = await fetch('/api/admin/settings');
-        if (res.ok) {
-          const data = await res.json();
+        const settingsDoc = await getDoc(doc(db, 'settings', 'app_settings'));
+        if (settingsDoc.exists()) {
+          const data = settingsDoc.data();
           setSettings({
-            auto_activate: data.auto_activate === '1',
-            default_clicks: parseInt(data.default_clicks) || 0
+            auto_activate: data.auto_activate === true,
+            default_clicks: data.default_clicks || 0,
+            gemini_api_key: data.gemini_api_key || ''
           });
+        } else {
+          setSettings({ auto_activate: true, default_clicks: 10, gemini_api_key: '' });
         }
       } else if (view === 'suggestions') {
-        const res = await fetch('/api/admin/suggestions');
-        if (res.ok) setSuggestions(await res.json());
+        const q = query(collection(db, 'suggestions'), orderBy('created_at', 'desc'));
+        const suggestionsSnap = await getDocs(q);
+        const suggestionsData = suggestionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })) as Suggestion[];
+        setSuggestions(suggestionsData);
       }
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.LIST, view);
     } finally {
       setLoading(false);
     }
@@ -78,55 +118,58 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
   const handleSaveUser = async () => {
     if (!selectedUser) return;
     try {
-      const res = await fetch(`/api/admin/user/${selectedUser.id}/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingUserData)
-      });
-      if (res.ok) {
-        fetchData();
-        setSelectedUser(null);
-        setIsEditingUser(false);
-      }
+      await updateDoc(doc(db, 'users', selectedUser.id), editingUserData);
+      fetchData();
+      setSelectedUser(null);
+      setIsEditingUser(false);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${selectedUser.id}`);
     }
   };
 
   const handleUpdateSubscription = async () => {
     if (!selectedUser) return;
     try {
-      const res = await fetch(`/api/admin/user/${selectedUser.id}/subscription`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscriptionData)
-      });
-      if (res.ok) {
-        fetchData();
-        setIsSubscriptionModalOpen(false);
-        setSelectedUser(null);
+      const updates: Partial<User> = {
+        usage_limit: subscriptionData.credits,
+        subscription_status: (subscriptionData as any).subscription_status || 'normal',
+      };
+      
+      if (subscriptionData.duration === 'weekly') {
+        const expires = new Date();
+        expires.setDate(expires.getDate() + 7);
+        updates.expires_at = expires.toISOString();
+      } else if (subscriptionData.duration === 'monthly') {
+        const expires = new Date();
+        expires.setMonth(expires.getMonth() + 1);
+        updates.expires_at = expires.toISOString();
+      } else if (subscriptionData.duration === 'yearly') {
+        const expires = new Date();
+        expires.setFullYear(expires.getFullYear() + 1);
+        updates.expires_at = expires.toISOString();
       }
+
+      await updateDoc(doc(db, 'users', selectedUser.id), updates);
+      fetchData();
+      setIsSubscriptionModalOpen(false);
+      setSelectedUser(null);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${selectedUser.id}`);
     }
   };
 
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auto_activate: settings.auto_activate ? '1' : '0',
-          default_clicks: settings.default_clicks.toString()
-        })
-      });
-      if (res.ok) {
-        // Show success toast or feedback
-      }
+      await setDoc(doc(db, 'settings', 'app_settings'), {
+        auto_activate: settings.auto_activate,
+        default_clicks: settings.default_clicks
+      }, { merge: true });
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.WRITE, 'settings/app_settings');
     } finally {
       setIsSavingSettings(false);
     }
@@ -189,7 +232,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
             { id: 'users', label: t.users, icon: Users },
             { id: 'history', label: t.history, icon: History },
             { id: 'suggestions', label: t.suggestions, icon: MessageCircle },
-            { id: 'site_editor', label: isEnglish ? 'Site Editor' : 'تعديل الموقع', icon: LayoutTemplate },
+            { id: 'site_editor', label: isEnglish ? 'Web Edit' : 'تعديل الويب', icon: LayoutTemplate },
             { id: 'settings', label: t.settings, icon: SettingsIcon }
           ].map((item) => (
             <button 
@@ -206,7 +249,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
 
       {/* Site Editor View */}
       {view === 'site_editor' && (
-        <SiteEditor isEnglish={isEnglish} />
+        <SiteEditor isEnglish={isEnglish} onEditLanding={onEditLanding} />
       )}
 
       {/* Stats View */}
@@ -266,6 +309,20 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
               </motion.div>
             )}
 
+            <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5">
+              <div className="space-y-4">
+                <h4 className="text-xl font-black text-white uppercase tracking-tight">{isEnglish ? 'Gemini API Key' : 'مفتاح Gemini API'}</h4>
+                <p className="text-dim font-medium leading-relaxed">{isEnglish ? 'Update the API key used for generating scripts. Leave empty to use the default key.' : 'قم بتحديث مفتاح API المستخدم لتوليد الاسكربتات. اتركه فارغاً لاستخدام المفتاح الافتراضي.'}</p>
+                <input 
+                  type="password" 
+                  value={settings.gemini_api_key || ''}
+                  onChange={(e) => setSettings({ ...settings, gemini_api_key: e.target.value })}
+                  placeholder={isEnglish ? 'Enter new Gemini API Key' : 'أدخل مفتاح Gemini API الجديد'}
+                  className="w-full input-field py-4 text-lg font-mono"
+                />
+              </div>
+            </div>
+
             <div className="flex justify-end pt-6">
               <button 
                 onClick={handleSaveSettings}
@@ -284,7 +341,9 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
       {view === 'users' && (
         <div className="space-y-8">
           <div className="relative group">
-            <Search className={`absolute top-1/2 ${isEnglish ? 'left-6' : 'right-6'} -translate-y-1/2 w-6 h-6 text-dim group-focus-within:text-brand-primary transition-colors`} />
+            <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+              <Search className="w-6 h-6" />
+            </div>
             <input 
               type="text" 
               placeholder={t.searchUsers}
@@ -308,18 +367,23 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-white/5 transition-all duration-300 group">
+                    <tr key={u.id} className={`hover:bg-white/5 transition-all duration-300 group ${u.subscription_status === 'premium' ? 'bg-amber-500/5 border-l-4 border-l-amber-500 shadow-[inset_4px_0_15px_rgba(245,158,11,0.1)]' : ''}`}>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary border border-brand-primary/20 overflow-hidden group-hover:scale-110 transition-transform">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden group-hover:scale-110 transition-transform ${u.subscription_status === 'premium' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-brand-primary/10 text-brand-primary border border-brand-primary/20'}`}>
                             {u.profile_pic ? (
                               <img src={u.profile_pic} alt={u.name} className="w-full h-full object-cover" />
                             ) : (
                               <UserIcon className="w-6 h-6" />
                             )}
                           </div>
-                          <div className="text-right">
-                            <p className="font-black text-white text-lg tracking-tight">{u.name}</p>
+                          <div className="flex flex-col items-start">
+                            <p className={`font-black text-lg tracking-tight flex items-center gap-2 ${u.subscription_status === 'premium' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'text-white'}`}>
+                              {u.name}
+                              {u.subscription_status === 'premium' && (
+                                <span className="text-[9px] bg-amber-500 text-black px-2 py-0.5 rounded-full uppercase tracking-widest font-black shadow-[0_0_10px_rgba(245,158,11,0.5)]">Premium</span>
+                              )}
+                            </p>
                             <p className="text-xs text-dim font-bold">{u.email}</p>
                           </div>
                         </div>
@@ -379,7 +443,9 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
       {view === 'history' && (
         <div className="space-y-8">
           <div className="relative group">
-            <Search className={`absolute top-1/2 ${isEnglish ? 'left-6' : 'right-6'} -translate-y-1/2 w-6 h-6 text-dim group-focus-within:text-brand-primary transition-colors`} />
+            <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+              <Search className="w-6 h-6" />
+            </div>
             <input 
               type="text" 
               placeholder={t.searchScripts}
@@ -423,7 +489,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                     </button>
                     {script.is_saved && (
                       <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                        <Bookmark className="w-5 h-5 text-amber-500 fill-amber-500" />
+                        <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
                       </div>
                     )}
                   </div>
@@ -604,15 +670,17 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                     />
                   </div>
 
-                  {/* Initial Limit */}
+                  {/* Subscription Status */}
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Initial Limit' : 'الحد الأصلي'}</label>
-                    <input 
-                      type="number" 
-                      value={editingUserData.initial_limit || 0}
-                      onChange={(e) => setEditingUserData({ ...editingUserData, initial_limit: parseInt(e.target.value) || 0 })}
+                    <label className="text-[10px] font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Subscription Status' : 'حالة الاشتراك'}</label>
+                    <select 
+                      value={editingUserData.subscription_status || 'normal'}
+                      onChange={(e) => setEditingUserData({ ...editingUserData, subscription_status: e.target.value as any })}
                       className="w-full input-field font-black uppercase tracking-widest text-sm"
-                    />
+                    >
+                      <option value="normal">{isEnglish ? 'Normal User' : 'مستخدم عادي'}</option>
+                      <option value="premium">{isEnglish ? 'Premium User' : 'مستخدم بريميوم'}</option>
+                    </select>
                   </div>
 
                   {/* Role */}
@@ -625,6 +693,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                     >
                       <option value="user">{t.user}</option>
                       <option value="manager">{t.manager}</option>
+                      <option value="admin">Admin</option>
                     </select>
                   </div>
                 </div>
@@ -700,11 +769,12 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
 
-        {/* Subscription Modal */}
-        <AnimatePresence>
-          {isSubscriptionModalOpen && selectedUser && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      {/* Subscription Modal */}
+      <AnimatePresence>
+        {isSubscriptionModalOpen && selectedUser && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -745,13 +815,15 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-xs font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Initial Limit' : 'الحد الأصلي'}</label>
-                    <input 
-                      type="number" 
-                      value={subscriptionData.initial_limit || 0}
-                      onChange={(e) => setSubscriptionData({ ...subscriptionData, initial_limit: parseInt(e.target.value) || 0 })}
-                      className="w-full input-field text-2xl font-black"
-                    />
+                    <label className="text-xs font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Subscription Status' : 'حالة الاشتراك'}</label>
+                    <select 
+                      value={subscriptionData.subscription_status || 'normal'}
+                      onChange={(e) => setSubscriptionData({ ...subscriptionData, subscription_status: e.target.value as any })}
+                      className="w-full input-field text-xl font-black"
+                    >
+                      <option value="normal">{isEnglish ? 'Normal User' : 'مستخدم عادي'}</option>
+                      <option value="premium">{isEnglish ? 'Premium User' : 'مستخدم بريميوم'}</option>
+                    </select>
                   </div>
 
                   <div className="space-y-4">
@@ -783,7 +855,6 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
             </div>
           )}
         </AnimatePresence>
-      </AnimatePresence>
     </div>
   );
 }

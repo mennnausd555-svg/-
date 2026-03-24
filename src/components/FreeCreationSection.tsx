@@ -2,23 +2,37 @@ import React, { useState } from 'react';
 import ScriptForm from './ScriptForm';
 import ScriptResults from './ScriptResults';
 import { generateScripts } from '../services/gemini';
-import { ScriptResult, User } from '../types';
+import { ScriptResult, User, SiteConfig } from '../types';
 import { Wand2, Sparkles, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { translations } from '../translations';
+import { db, collection, addDoc, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface FreeCreationSectionProps {
   isEnglish: boolean;
   user: User;
+  config?: SiteConfig;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function FreeCreationSection({ isEnglish, user }: FreeCreationSectionProps) {
+export default function FreeCreationSection({ isEnglish, user, config, onSelectElement }: FreeCreationSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<ScriptResult[]>([]);
-  const [scriptId, setScriptId] = useState<number | null>(null);
+  const [scriptId, setScriptId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [idea, setIdea] = useState<string>('');
   const t = isEnglish ? translations.en : translations.ar;
+
+  const getEditableProps = (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => {
+    if (!onSelectElement) return {};
+    return {
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectElement(path, type, label);
+      },
+      className: "cursor-pointer hover:outline hover:outline-2 hover:outline-brand-primary hover:outline-offset-4 transition-all"
+    };
+  };
 
   const handleSubmit = async (data: any) => {
     setIsLoading(true);
@@ -27,10 +41,8 @@ export default function FreeCreationSection({ isEnglish, user }: FreeCreationSec
     setIdea(data.topic);
     try {
       // 1. Check limits first
-      const limitRes = await fetch('/api/check-limits');
-      if (!limitRes.ok) {
-        const errorData = await limitRes.json();
-        throw new Error(errorData.error || (isEnglish ? 'Failed to verify permissions' : 'فشل التحقق من الصلاحيات'));
+      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit <= 0) {
+        throw new Error(isEnglish ? 'Usage limit exceeded. Please upgrade your subscription.' : 'لقد استنفدت الحد المسموح لك. يرجى ترقية اشتراكك.');
       }
 
       // 2. Generate scripts
@@ -47,32 +59,27 @@ export default function FreeCreationSection({ isEnglish, user }: FreeCreationSec
 
       // Save to database
       try {
-        const saveRes = await fetch('/api/scripts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: data.topic || (isEnglish ? 'New Script (Free Creation)' : 'اسكربت جديد (إنشاء حر)'),
-            content: generatedScripts,
-            inputs: data
-          })
+        const docRef = await addDoc(collection(db, 'scripts'), {
+          user_id: user.id,
+          title: data.topic || (isEnglish ? 'New Script (Free Creation)' : 'اسكربت جديد (إنشاء حر)'),
+          content: JSON.stringify(generatedScripts),
+          inputs: JSON.stringify(data),
+          type: 'free',
+          is_saved: false,
+          is_filmed: false,
+          created_at: new Date().toISOString()
         });
+        setScriptId(docRef.id);
 
-        if (saveRes.ok) {
-          const saveData = await saveRes.json();
-          setScriptId(saveData.id);
-        } else {
-          let errorMsg = isEnglish ? 'Failed to save script to history' : 'فشل حفظ الاسكربت في السجل';
-          try {
-            const contentType = saveRes.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const errorData = await saveRes.json();
-              errorMsg = errorData.error || errorMsg;
-            }
-          } catch (e) {}
-          console.warn(errorMsg);
+        // Decrement user limit
+        if (user.role !== 'admin' && user.role !== 'manager') {
+          await updateDoc(doc(db, 'users', user.id), {
+            usage_limit: user.usage_limit - 1
+          });
         }
       } catch (saveErr: any) {
         console.error('Failed to save script:', saveErr);
+        handleFirestoreError(saveErr, OperationType.CREATE, 'scripts');
       }
 
       setResults(generatedScripts);
@@ -91,11 +98,19 @@ export default function FreeCreationSection({ isEnglish, user }: FreeCreationSec
             <Wand2 className="w-8 h-8 text-brand-primary" />
           </div>
           <div>
-            <h2 className="text-4xl font-black text-white tracking-tight mb-3">{t.freeCreation}</h2>
-            <p className="text-dim text-xl max-w-2xl leading-relaxed font-medium">
-              {isEnglish 
+            <h2 
+              {...getEditableProps('pages.freeGeneration.title', 'text', 'Free Generation Page Title')}
+              className="text-4xl font-black text-white tracking-tight mb-3"
+            >
+              {config?.pages?.freeGeneration?.title || t.freeCreation}
+            </h2>
+            <p 
+              {...getEditableProps('pages.freeGeneration.subtitle', 'text', 'Free Generation Page Subtitle')}
+              className="text-dim text-xl max-w-2xl leading-relaxed font-medium"
+            >
+              {config?.pages?.freeGeneration?.subtitle || (isEnglish 
                 ? 'Let the AI engine select the optimal blueprint for your niche and craft a masterpiece.' 
-                : 'دع الذكاء الاصطناعي يختار الفورمات الأنسب لمجالك ويبدع في كتابة الاسكربت.'}
+                : 'دع الذكاء الاصطناعي يختار الفورمات الأنسب لمجالك ويبدع في كتابة الاسكربت.')}
             </p>
           </div>
         </div>

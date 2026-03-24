@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "profile_pic": { "type": "string" },
+        "social_links": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "manager"] },
+        "status": { "type": "string", "enum": ["pending", "active", "frozen"] },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "usage_limit": { "type": "number" },
+        "initial_limit": { "type": "number" },
+        "usage_period": { "type": "string" },
+        "subscription_status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "status"]
+    },
+    "Script": {
+      "title": "Script",
+      "description": "Generated script",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "inputs": { "type": "string" },
+        "content": { "type": "string" },
+        "is_saved": { "type": "boolean" },
+        "video_link": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "title", "content"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Global app settings",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"]
+    },
+    "Suggestion": {
+      "title": "Suggestion",
+      "description": "User suggestions",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "content": { "type": "string" },
+        "files": { "type": "string" },
+        "links": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "/scripts/{scriptId}": {
+      "schema": { "$ref": "#/entities/Script" },
+      "description": "Stores generated scripts"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Setting" },
+      "description": "Stores global settings"
+    },
+    "/suggestions/{suggestionId}": {
+      "schema": { "$ref": "#/entities/Suggestion" },
+      "description": "Stores user suggestions"
+    }
+  }
+}

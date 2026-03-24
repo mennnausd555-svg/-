@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { ScriptResult } from '../types';
-import { Sparkles, Video, Brain, Heart, CheckCircle2, Copy, FileDown, CheckSquare, Square, FileText, Share2, Bookmark } from 'lucide-react';
+import { Sparkles, Video, Brain, Heart, CheckCircle2, Copy, FileDown, CheckSquare, Square, FileText, Share2, Star } from 'lucide-react';
 import jsPDF from 'jspdf';
 import InteractiveCat from './InteractiveCat';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface ScriptResultsProps {
   results: ScriptResult[];
@@ -23,16 +24,13 @@ export default function ScriptResults({ results, isEnglish, scriptId, idea }: Sc
     if (!scriptId) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/scripts/${scriptId}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_saved: !isSaved })
+      await updateDoc(doc(db, 'scripts', String(scriptId)), {
+        is_saved: !isSaved
       });
-      if (res.ok) {
-        setIsSaved(!isSaved);
-      }
+      setIsSaved(!isSaved);
     } catch (err) {
       console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, `scripts/${scriptId}`);
     } finally {
       setIsSaving(false);
     }
@@ -233,8 +231,8 @@ export default function ScriptResults({ results, isEnglish, scriptId, idea }: Sc
               disabled={isSaving}
               className={`text-xs px-6 py-3 rounded-2xl font-black uppercase tracking-widest flex items-center gap-3 transition-all border ${isSaved ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-white/5 text-dim hover:text-white border-white/5'}`}
             >
-              <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-amber-500' : ''}`} />
-              {isSaved ? (isEnglish ? 'Saved' : 'تم الحفظ') : (isEnglish ? 'Save Script' : 'حفظ الاسكربت')}
+              <Star className={`w-4 h-4 ${isSaved ? 'fill-amber-500' : ''}`} />
+              {isSaved ? (isEnglish ? 'Starred' : 'مميزة بنجمة') : (isEnglish ? 'Star Script' : 'تمييز بنجمة')}
             </button>
           )}
         </div>
@@ -257,6 +255,16 @@ export default function ScriptResults({ results, isEnglish, scriptId, idea }: Sc
                 >
                   {selectedIndices.includes(index) ? <CheckSquare className="w-7 h-7" /> : <Square className="w-7 h-7" />}
                 </button>
+                {scriptId && (
+                  <button 
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className={`p-2 rounded-xl transition-all duration-300 ${isSaved ? 'text-amber-500 bg-amber-500/10 border border-amber-500/20' : 'text-dim bg-white/5 border border-white/5 hover:border-white/20 hover:text-amber-500'}`}
+                    title={isEnglish ? 'Star this script' : 'تمييز بنجمة'}
+                  >
+                    <Star className={`w-7 h-7 ${isSaved ? 'fill-amber-500' : ''}`} />
+                  </button>
+                )}
                 <div className="flex items-center gap-5">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${index === 0 ? 'bg-brand-primary/20 border-brand-primary/30' : 'bg-emerald-500/20 border-emerald-500/30'}`}>
                     {index === 0 ? (
