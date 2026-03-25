@@ -24,7 +24,7 @@ import { translations } from './translations';
 import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot } from './firebase';
 
 const DEFAULT_CONFIG: SiteConfig = {
-  logo: { type: 'icon', value: 'Wand2' },
+  logo: { type: 'image', value: '/logo.png' },
   colors: {
     primary: '#0066FF',
     secondary: '#8B5CF6',

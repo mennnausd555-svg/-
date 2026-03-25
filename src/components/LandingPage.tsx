@@ -148,9 +148,13 @@ export default function LandingPage({ onStart, isEnglish, setIsEnglish, config, 
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(0,102,255,0.3)]">
-              <Wand2 className="w-6 h-6 text-white" />
-            </div>
+            {config.logo?.type === 'image' && config.logo?.value ? (
+              <img src={config.logo.value} alt="Logo" className="h-10 object-contain" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-10 h-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(0,102,255,0.3)]">
+                <Wand2 className="w-6 h-6 text-white" />
+              </div>
+            )}
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight uppercase">
                 <EditableText 
