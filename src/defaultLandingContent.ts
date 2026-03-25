@@ -1,6 +1,6 @@
 export const DEFAULT_LANDING_CONTENT = {
   header: {
-    logo: '',
+    logo: 'Abqareno AI',
     bannerEn: 'Write video scripts that hook viewers... before they hit skip.',
     bannerAr: 'اكتب سكربتات فيديو تجذب المشاهد… قبل أن يضغط زر التخطي.',
     btnEn: 'Get started for free',

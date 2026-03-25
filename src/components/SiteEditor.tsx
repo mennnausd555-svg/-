@@ -5,7 +5,7 @@ import { SiteConfig } from '../types';
 import { db, doc, getDoc, setDoc, handleFirestoreError, OperationType } from '../firebase';
 
 const DEFAULT_CONFIG: SiteConfig = {
-  logo: { type: 'image', value: 'https://i.ibb.co/v4m0Y3S/logo-new.png' },
+  logo: { type: 'icon', value: 'Wand2' },
   colors: {
     primary: '#0066FF',
     secondary: '#8B5CF6',

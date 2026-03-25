@@ -258,7 +258,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
       >
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-4 mb-8">
-            {config?.logo?.type === 'image' && config.logo.value ? (
+            {config?.logo.type === 'image' && config.logo.value ? (
               <img src={config.logo.value} alt="Logo" className="h-16 object-contain" referrerPolicy="no-referrer" />
             ) : (
               <div className="w-16 h-16 bg-brand-primary rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,102,255,0.4)] border border-white/10">
