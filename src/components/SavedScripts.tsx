@@ -10,9 +10,11 @@ interface SavedScriptsProps {
   user: User;
   isEnglish: boolean;
   isAdmin?: boolean;
+  config?: any;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
-export default function SavedScripts({ user, isEnglish, isAdmin = false }: SavedScriptsProps) {
+export default function SavedScripts({ user, isEnglish, isAdmin = false, config, onSelectElement }: SavedScriptsProps) {
   const t = isEnglish ? translations.en : translations.ar;
   const [scripts, setScripts] = useState<ScriptHistory[]>([]);
   const [loading, setLoading] = useState(true);

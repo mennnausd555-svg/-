@@ -18,6 +18,7 @@ import SavedScripts from './components/SavedScripts';
 import FilmedScripts from './components/FilmedScripts';
 import Auth from './components/Auth';
 import LandingPage from './components/LandingPage';
+import WhatsAppWidget from './components/WhatsAppWidget';
 import { User, SiteConfig } from './types';
 import { translations } from './translations';
 import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot } from './firebase';
@@ -41,7 +42,12 @@ const DEFAULT_CONFIG: SiteConfig = {
     formats: { title: 'Viral Formats', subtitle: 'Choose a format to start generating your script.', visible: true },
     freeGeneration: { title: 'Free Generation', subtitle: 'Generate any script you want without a specific format.', visible: true },
     textLab: { title: 'Text Lab', subtitle: 'Analyze and improve your scripts.', visible: true },
-    archive: { title: 'Archive', subtitle: 'View your saved scripts.', visible: true }
+    archive: { title: 'Archive', subtitle: 'View your saved scripts.', visible: true },
+    auth: { title: 'Auth', subtitle: 'Authentication', visible: true },
+    filmedScripts: { title: 'Filmed Scripts', subtitle: 'View your filmed scripts.', visible: true },
+    profile: { title: 'Profile', subtitle: 'Manage your profile.', visible: true },
+    subscription: { title: 'Subscription', subtitle: 'Manage your subscription.', visible: true },
+    suggestions: { title: 'Suggestions', subtitle: 'Send us your suggestions.', visible: true }
   }
 };
 
@@ -390,7 +396,7 @@ export default function App() {
                 {activeTab === 'formats' && <FormatSection isEnglish={isEnglish} user={currentUser} />}
                 {activeTab === 'free' && <FreeCreationSection isEnglish={isEnglish} user={currentUser} />}
                 {activeTab === 'evaluate' && <EvaluationSection isEnglish={isEnglish} user={currentUser} />}
-                {activeTab === 'history' && <ScriptHistoryView isEnglish={isEnglish} />}
+                {activeTab === 'history' && <ScriptHistoryView isEnglish={isEnglish} user={currentUser} />}
                 {activeTab === 'saved' && <SavedScripts user={currentUser} isEnglish={isEnglish} />}
                 {activeTab === 'filmed' && <FilmedScripts user={currentUser} isEnglish={isEnglish} />}
                 {activeTab === 'suggestions' && <Suggestions user={currentUser} isEnglish={isEnglish} />}
@@ -418,16 +424,7 @@ export default function App() {
       )}
 
       {/* WhatsApp Floating Button */}
-      <a 
-        href="https://wa.me/201022049346" 
-        target="_blank" 
-        className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 hover:scale-110 transition-transform group"
-      >
-        <MessageCircle className="w-8 h-8 text-white" />
-        <span className="absolute right-20 bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          {isEnglish ? 'WhatsApp Support' : 'الدعم الفني واتساب'}
-        </span>
-      </a>
+      {user && <WhatsAppWidget />}
     </div>
   );
 }

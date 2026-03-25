@@ -22,7 +22,7 @@ interface AppSettings {
 export default function AdminDashboard({ onImpersonate, isEnglish, defaultView = 'stats', onEditLanding }: AdminDashboardProps) {
   const [view, setView] = useState(defaultView);
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState({ totalUsers: 0, totalScripts: 0, activeToday: 0, totalSuggestions: 0 });
+  const [stats, setStats] = useState({ totalUsers: 0, totalScripts: 0, activeToday: 0, totalSuggestions: 0, totalVisitors: 0, ctaClicks: 0 });
   const [allScripts, setAllScripts] = useState<ScriptHistory[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ auto_activate: true, default_clicks: 10, gemini_api_key: '' });
@@ -70,7 +70,9 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
           totalUsers: usersSnap.size,
           totalScripts: scriptsSnap.size,
           activeToday: activeToday,
-          totalSuggestions: suggestionsSnap.size
+          totalSuggestions: suggestionsSnap.size,
+          totalVisitors: 0, // Placeholder
+          ctaClicks: 0 // Placeholder
         });
       } else if (view === 'users') {
         const usersSnap = await getDocs(collection(db, 'users'));
@@ -254,11 +256,13 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
 
       {/* Stats View */}
       {view === 'stats' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           <StatCard icon={Users} label={t.totalUsers} value={stats.totalUsers} color="brand-primary" />
           <StatCard icon={History} label={t.totalScripts} value={stats.totalScripts} color="brand-secondary" />
           <StatCard icon={Activity} label={t.activeToday} value={stats.activeToday} color="emerald" />
           <StatCard icon={MessageCircle} label={t.totalSuggestions} value={stats.totalSuggestions} color="amber" />
+          <StatCard icon={Eye} label={isEnglish ? 'Total Visitors' : 'إجمالي الزوار'} value={stats.totalVisitors} color="sky" />
+          <StatCard icon={Zap} label={isEnglish ? 'CTA Clicks' : 'نقرات CTA'} value={stats.ctaClicks} color="rose" />
         </div>
       )}
 
@@ -474,6 +478,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                       <h4 className="text-xl font-black text-white group-hover:text-brand-primary transition-colors tracking-tight uppercase">{script.title}</h4>
                       <div className="flex items-center gap-3 mt-2">
                         <span className="text-xs font-black text-brand-primary uppercase tracking-widest">{script.user_name}</span>
+                        <span className="text-xs text-dim font-bold">{script.user_email}</span>
                         <span className="w-1 h-1 bg-white/20 rounded-full"></span>
                         <span className="text-xs text-dim font-bold">{new Date(script.created_at).toLocaleString(isEnglish ? 'en-US' : 'ar-EG')}</span>
                       </div>

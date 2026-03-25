@@ -41,8 +41,8 @@ export default function FormatSection({ isEnglish, user, config, onSelectElement
     setIdea(data.topic);
     try {
       // 1. Check limits first
-      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit <= 0) {
-        throw new Error(isEnglish ? 'Usage limit exceeded. Please upgrade your subscription.' : 'لقد استنفدت الحد المسموح لك. يرجى ترقية اشتراكك.');
+      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit < 10) {
+        throw new Error(isEnglish ? 'Insufficient credits. You need at least 10 credits.' : 'رصيد غير كافٍ. تحتاج إلى 10 نقاط على الأقل.');
       }
 
       // 2. Generate scripts
@@ -61,6 +61,8 @@ export default function FormatSection({ isEnglish, user, config, onSelectElement
       try {
         const docRef = await addDoc(collection(db, 'scripts'), {
           user_id: user.id,
+          user_name: user.name,
+          user_email: user.email,
           title: data.topic || (isEnglish ? 'New Script' : 'اسكربت جديد'),
           content: JSON.stringify(generatedScripts),
           inputs: JSON.stringify(data),
@@ -74,7 +76,7 @@ export default function FormatSection({ isEnglish, user, config, onSelectElement
         // Decrement user limit
         if (user.role !== 'admin' && user.role !== 'manager') {
           await updateDoc(doc(db, 'users', user.id), {
-            usage_limit: user.usage_limit - 1
+            usage_limit: user.usage_limit - 10
           });
         }
       } catch (saveErr: any) {

@@ -15,6 +15,7 @@ interface LandingPageProps {
   setIsEnglish: (val: boolean) => void;
   config: any;
   editMode?: boolean;
+  onSelectElement?: (path: string, type: 'text' | 'image' | 'video' | 'section', label: string) => void;
 }
 
 function EditableText({ 
@@ -629,7 +630,7 @@ export default function LandingPage({ onStart, isEnglish, setIsEnglish, config, 
       <footer className="py-10 border-t border-white/5 text-center text-dim text-sm">
         <p>
           <EditableText 
-            value={(isEnglish ? (c.footer?.textEn || '© {year} Viral Script AI. All rights reserved.') : (c.footer?.textAr || '© {year} Viral Script AI. جميع الحقوق محفوظة.')).replace('{year}', new Date().getFullYear().toString())} 
+            value={(isEnglish ? (c.footer?.textEn || '© {year} Abqareno AI. All rights reserved.') : (c.footer?.textAr || '© {year} عبقرينو. جميع الحقوق محفوظة.')).replace('{year}', new Date().getFullYear().toString())} 
             onChange={(v) => updateContent('footer', isEnglish ? 'textEn' : 'textAr', v.replace(new Date().getFullYear().toString(), '{year}'))} 
             isEditing={editMode} 
           />

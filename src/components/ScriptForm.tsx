@@ -41,7 +41,7 @@ const CURIOSITY_LEVELS_EN = [
   'Auto (AI Determined)',
   'Beginner (Open & Close Instantly)',
   'Intermediate (Open, Close, Open Another)',
-  'Advanced / Viral (Open Loop & Delay Answer)'
+  'Advanced / Abqareno (Open Loop & Delay Answer)'
 ];
 
 const EMOTIONS_AR = [

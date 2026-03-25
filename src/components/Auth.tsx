@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, Phone, UserPlus, LogIn, AlertCircle, Wand2, ArrowRight, ArrowLeft, MessageCircle } from 'lucide-react';
+import { User, Lock, Mail, Phone, UserPlus, LogIn, AlertCircle, Wand2, ArrowRight, ArrowLeft, MessageCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations } from '../translations';
 import { SiteConfig } from '../types';
@@ -21,8 +21,9 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isCompletingGoogle, setIsCompletingGoogle] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [tempGoogleUser, setTempGoogleUser] = useState<any>(null);
+  const [isCompletingGoogle, setIsCompletingGoogle] = useState(false);
 
   const t = isEnglish ? translations.en : translations.ar;
 
@@ -264,7 +265,6 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                 <Wand2 className="w-8 h-8 text-white" />
               </div>
             )}
-            <h1 className="text-3xl font-black tracking-tight uppercase text-white">Abqareno AI</h1>
           </div>
           <h2 
             {...getEditableProps(isCompletingGoogle ? 'pages.auth.completeProfile.title' : isLogin ? 'pages.auth.login.title' : 'pages.auth.register.title', 'text', isCompletingGoogle ? 'Complete Profile Title' : isLogin ? 'Login Title' : 'Signup Title')}
@@ -325,13 +325,20 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                   <Lock className="w-5 h-5" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
                   placeholder="••••••••"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={`absolute ${isEnglish ? 'right-4' : 'left-4'} top-0 bottom-0 flex items-center text-dim hover:text-white`}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 
@@ -411,7 +418,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
               <div className="space-y-2">
                 <label className="text-xs font-black text-dim uppercase tracking-widest px-1">{isEnglish ? 'Email or Phone' : 'البريد الإلكتروني أو رقم الهاتف'}</label>
                 <div className="relative group">
-                  <div className={`absolute ${isEnglish ? 'left-0' : 'right-0'} top-0 bottom-0 w-16 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
+                  <div className={`absolute ${isEnglish ? 'left-2' : 'right-2'} top-2 bottom-2 w-10 flex items-center justify-center text-dim group-focus-within:text-brand-primary transition-colors z-10`}>
                     <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-focus-within:bg-brand-primary/10 transition-colors">
                       <Mail className="w-5 h-5" />
                     </div>
@@ -420,7 +427,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className={`input-field ${isEnglish ? 'pl-20' : 'pr-20'}`}
+                    className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
                     placeholder={isEnglish ? 'name@example.com or 01xxxxxxxxx' : 'البريد الإلكتروني أو 01xxxxxxxxx'}
                     required
                   />
@@ -436,13 +443,20 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                     </div>
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={`input-field ${isEnglish ? 'pl-20' : 'pr-20'}`}
                     placeholder="••••••••"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className={`absolute ${isEnglish ? 'right-4' : 'left-4'} top-0 bottom-0 flex items-center text-dim hover:text-white`}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
 
@@ -501,18 +515,6 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
         )}
 
       </motion.div>
-
-      {/* WhatsApp Floating Button */}
-      <a 
-        href="https://wa.me/201022049346" 
-        target="_blank" 
-        className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40 hover:scale-110 transition-transform group"
-      >
-        <MessageCircle className="w-8 h-8 text-white" />
-        <span className="absolute right-20 bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          {isEnglish ? 'WhatsApp Support' : 'الدعم الفني واتساب'}
-        </span>
-      </a>
     </div>
   );
 }

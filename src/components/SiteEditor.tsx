@@ -23,7 +23,12 @@ const DEFAULT_CONFIG: SiteConfig = {
     formats: { title: 'Viral Formats', subtitle: 'Choose a format to start generating your script.', visible: true },
     freeGeneration: { title: 'Free Generation', subtitle: 'Generate any script you want without a specific format.', visible: true },
     textLab: { title: 'Text Lab', subtitle: 'Analyze and improve your scripts.', visible: true },
-    archive: { title: 'Archive', subtitle: 'View your saved scripts.', visible: true }
+    archive: { title: 'Archive', subtitle: 'View your saved scripts.', visible: true },
+    auth: { title: 'Auth', subtitle: 'Authentication', visible: true },
+    filmedScripts: { title: 'Filmed Scripts', subtitle: 'View your filmed scripts.', visible: true },
+    profile: { title: 'Profile', subtitle: 'Manage your profile.', visible: true },
+    subscription: { title: 'Subscription', subtitle: 'Manage your subscription.', visible: true },
+    suggestions: { title: 'Suggestions', subtitle: 'Send us your suggestions.', visible: true }
   }
 };
 

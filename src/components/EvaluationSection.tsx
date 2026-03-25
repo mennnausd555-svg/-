@@ -69,8 +69,8 @@ export default function EvaluationSection({ isEnglish, user, config, onSelectEle
     setScriptId(null);
     try {
       // Check limits
-      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit <= 0) {
-        throw new Error(isEnglish ? 'Usage limit exceeded. Please upgrade your subscription.' : 'لقد استنفدت الحد المسموح لك. يرجى ترقية اشتراكك.');
+      if (user.role !== 'admin' && user.role !== 'manager' && user.usage_limit < 10) {
+        throw new Error(isEnglish ? 'Insufficient credits. You need at least 10 credits.' : 'رصيد غير كافٍ. تحتاج إلى 10 نقاط على الأقل.');
       }
 
       const evaluation = await evaluateScript(script, dialect);
@@ -80,6 +80,8 @@ export default function EvaluationSection({ isEnglish, user, config, onSelectEle
       try {
         const docRef = await addDoc(collection(db, 'scripts'), {
           user_id: user.id,
+          user_name: user.name,
+          user_email: user.email,
           title: isEnglish ? 'Script Evaluation' : 'تقييم اسكربت',
           content: JSON.stringify(evaluation),
           inputs: JSON.stringify({ script, dialect }),
@@ -93,7 +95,7 @@ export default function EvaluationSection({ isEnglish, user, config, onSelectEle
         // Decrement user limit
         if (user.role !== 'admin' && user.role !== 'manager') {
           await updateDoc(doc(db, 'users', user.id), {
-            usage_limit: user.usage_limit - 1
+            usage_limit: user.usage_limit - 10
           });
         }
       } catch (saveErr) {
@@ -263,7 +265,7 @@ export default function EvaluationSection({ isEnglish, user, config, onSelectEle
                 <p className="text-dim text-lg leading-relaxed font-medium">{result.hookAnalysis}</p>
                 
                 <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-xs font-black text-dim uppercase tracking-widest mb-6">{isEnglish ? 'Viral Hook Alternatives:' : 'هوكات مقترحة:'}</h4>
+                  <h4 className="text-xs font-black text-dim uppercase tracking-widest mb-6">{isEnglish ? 'Abqareno Hook Alternatives:' : 'هوكات مقترحة:'}</h4>
                   <ul className="space-y-4">
                     {result.suggestedHooks.map((hook, idx) => (
                       <li key={idx} className="flex items-start gap-4 text-white bg-white/5 p-5 rounded-2xl border border-white/5 group/item hover:bg-white/10 transition-colors">

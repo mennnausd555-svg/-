@@ -70,6 +70,23 @@ export interface SiteConfig {
     freeGeneration: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
     textLab: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
     archive: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    auth: { 
+      title: string; 
+      subtitle: string; 
+      videoUrl?: string; 
+      visible: boolean;
+      login?: { title: string; subtitle: string; };
+      register?: { title: string; subtitle: string; };
+      completeProfile?: { title: string; subtitle: string; };
+    };
+    filmedScripts: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    profile: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    subscription: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+    suggestions: { title: string; subtitle: string; videoUrl?: string; visible: boolean; };
+  };
+  typography?: {
+    fontFamily: string;
+    headingFont?: string;
   };
   landingContent?: any;
 }
