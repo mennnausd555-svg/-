@@ -175,15 +175,9 @@ export default function App() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-deep">
-      <div className="flex flex-col items-center justify-center p-6">
-        <video 
-          src="/logo-video.mp4" 
-          autoPlay 
-          loop 
-          muted 
-          playsInline 
-          className="w-full max-w-[280px] md:max-w-[450px] h-auto drop-shadow-[0_0_30px_rgba(0,102,255,0.2)]"
-        />
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,102,255,0.3)]"></div>
+        <p className="text-dim font-bold tracking-widest animate-pulse uppercase text-sm">{t.loading}</p>
       </div>
     </div>
   );

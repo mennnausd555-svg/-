@@ -190,21 +190,7 @@ export default function ScriptHistoryView({ isEnglish, user }: ScriptHistoryProp
    }
  };
 
- if (loading) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 space-y-8">
-      <video 
-        src="/logo-video.mp4" 
-        autoPlay 
-        loop 
-        muted 
-        playsInline 
-        className="w-32 h-32 object-contain"
-      />
-      <p className="text-dim font-black uppercase tracking-[0.3em] text-xs animate-pulse">{isEnglish ? 'Loading...' : 'جاري التحميل...'}</p>
-    </div>
-  );
- }
+ if (loading) return <div className="flex justify-center py-12 text-[var(--text-secondary)]">{isEnglish ? 'Loading...' : 'جاري التحميل...'}</div>;
 
  return (
  <div className="space-y-6 animate-fade-up">
