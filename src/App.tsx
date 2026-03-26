@@ -174,11 +174,19 @@ export default function App() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-deep">
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,102,255,0.3)]"></div>
-        <p className="text-dim font-bold tracking-widest animate-pulse uppercase text-sm">{t.loading}</p>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+      <motion.div
+        animate={{ scale: [1, 1.02, 1] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        className="relative w-72 h-72 md:w-96 md:h-96 flex flex-col items-center justify-center"
+      >
+        <img
+          src="/logo-video.mp4 (1).gif"
+          alt="Loading..."
+          className="w-full h-full object-contain"
+          referrerPolicy="no-referrer"
+        />
+      </motion.div>
     </div>
   );
 

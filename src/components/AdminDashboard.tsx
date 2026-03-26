@@ -213,9 +213,16 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
 
   if (loading && !users.length && !allScripts.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-6">
-        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,102,255,0.3)]"></div>
-        <p className="text-dim font-black uppercase tracking-widest text-sm animate-pulse">{t.loading}</p>
+      <div className="flex flex-col items-center justify-center py-24 gap-8">
+        <video 
+          src="/logo-video.mp4" 
+          autoPlay 
+          loop 
+          muted 
+          playsInline 
+          className="w-32 h-32 object-contain"
+        />
+        <p className="text-dim font-black uppercase tracking-[0.3em] text-sm animate-pulse">{t.loading}</p>
       </div>
     );
   }
