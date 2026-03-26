@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { User, ScriptHistory, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
-import LoadingVideo from './LoadingVideo';
 import { Video, Link as LinkIcon, Plus, CheckCircle2, MessageCircle, ExternalLink, Trash2, Search, X, Wand2 } from 'lucide-react';
 import { db, collection, query, where, getDocs, doc, updateDoc, handleFirestoreError, OperationType } from '../firebase';
 
@@ -107,8 +106,16 @@ export default function FilmedScripts({ user, isEnglish, isAdmin, config, onSele
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24">
-        <LoadingVideo size="xl" />
+      <div className="flex flex-col items-center justify-center py-20 space-y-8">
+        <video 
+          src="/logo-video.mp4" 
+          autoPlay 
+          loop 
+          muted 
+          playsInline 
+          className="w-32 h-32 object-contain"
+        />
+        <p className="text-dim font-black uppercase tracking-[0.3em] text-xs animate-pulse">{isEnglish ? 'Loading...' : 'جاري التحميل...'}</p>
       </div>
     );
   }

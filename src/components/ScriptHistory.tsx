@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Copy, FileDown, Trash2, ExternalLink, CheckCircle2, Video, Brain, Heart } from 'lucide-react';
 import { ScriptHistory, ScriptResult, User } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import LoadingVideo from './LoadingVideo';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { db, collection, query, where, getDocs, orderBy, handleFirestoreError, OperationType, auth } from '../firebase';
@@ -191,13 +190,21 @@ export default function ScriptHistoryView({ isEnglish, user }: ScriptHistoryProp
    }
  };
 
-   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24">
-        <LoadingVideo size="xl" />
-      </div>
-    );
-  }
+ if (loading) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-8">
+      <video 
+        src="/logo-video.mp4" 
+        autoPlay 
+        loop 
+        muted 
+        playsInline 
+        className="w-32 h-32 object-contain"
+      />
+      <p className="text-dim font-black uppercase tracking-[0.3em] text-xs animate-pulse">{isEnglish ? 'Loading...' : 'جاري التحميل...'}</p>
+    </div>
+  );
+ }
 
  return (
  <div className="space-y-6 animate-fade-up">
