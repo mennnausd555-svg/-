@@ -19,6 +19,7 @@ import FilmedScripts from './components/FilmedScripts';
 import Auth from './components/Auth';
 import LandingPage from './components/LandingPage';
 import WhatsAppWidget from './components/WhatsAppWidget';
+import LoadingVideo from './components/LoadingVideo';
 import { User, SiteConfig } from './types';
 import { translations } from './translations';
 import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot } from './firebase';
@@ -175,10 +176,7 @@ export default function App() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-deep">
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,102,255,0.3)]"></div>
-        <p className="text-dim font-bold tracking-widest animate-pulse uppercase text-sm">{t.loading}</p>
-      </div>
+      <LoadingVideo size="xl" />
     </div>
   );
 

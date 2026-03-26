@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Copy, FileDown, Trash2, ExternalLink, CheckCircle2, Video, Brain, Heart } from 'lucide-react';
 import { ScriptHistory, ScriptResult, User } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import LoadingVideo from './LoadingVideo';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { db, collection, query, where, getDocs, orderBy, handleFirestoreError, OperationType, auth } from '../firebase';
@@ -190,7 +191,13 @@ export default function ScriptHistoryView({ isEnglish, user }: ScriptHistoryProp
    }
  };
 
- if (loading) return <div className="flex justify-center py-12 text-[var(--text-secondary)]">{isEnglish ? 'Loading...' : 'جاري التحميل...'}</div>;
+   if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <LoadingVideo size="xl" />
+      </div>
+    );
+  }
 
  return (
  <div className="space-y-6 animate-fade-up">

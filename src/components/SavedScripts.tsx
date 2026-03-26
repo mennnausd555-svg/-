@@ -4,6 +4,7 @@ import { ScriptHistory, User } from '../types';
 import { translations } from '../translations';
 import ScriptResults from './ScriptResults';
 import { motion, AnimatePresence } from 'motion/react';
+import LoadingVideo from './LoadingVideo';
 import { db, collection, query, where, getDocs, handleFirestoreError, OperationType } from '../firebase';
 
 interface SavedScriptsProps {
@@ -172,9 +173,8 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false, config,
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <div className="w-12 h-12 border-4 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin" />
-        <p className="text-dim font-black uppercase tracking-widest text-xs">{t.loading}</p>
+      <div className="flex flex-col items-center justify-center py-24">
+        <LoadingVideo size="xl" />
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { MessageSquare, Send, Link as LinkIcon, File as FileIcon, CheckCircle, X
 import { User, Suggestion, SiteConfig } from '../types';
 import { translations } from '../translations';
 import { motion, AnimatePresence } from 'motion/react';
+import LoadingVideo from './LoadingVideo';
 import { db, collection, query, getDocs, orderBy, addDoc, handleFirestoreError, OperationType } from '../firebase';
 
 interface SuggestionsProps {
@@ -135,9 +136,8 @@ export default function Suggestions({ user, isEnglish, isAdmin = false, config, 
         </div>
 
         {fetching ? (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-            <div className="w-12 h-12 border-4 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin" />
-            <p className="text-dim font-black uppercase tracking-widest text-xs">{t.loading}</p>
+          <div className="flex flex-col items-center justify-center py-24">
+            <LoadingVideo size="xl" />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-8">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, History, TrendingUp, Search, UserPlus, Shield, Ban, CheckCircle, Clock, MoreVertical, ExternalLink, Trash2, Save, X, Settings as SettingsIcon, MessageCircle, Star, Eye, Lock, Unlock, Snowflake, User as UserIcon, BarChart3, Mail, Phone, Calendar, FileText, Activity, Zap, LayoutTemplate } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import LoadingVideo from './LoadingVideo';
 import { User, ScriptHistory, Suggestion, SiteConfig } from '../types';
 import { translations } from '../translations';
 import SiteEditor from './SiteEditor';
@@ -213,9 +214,8 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
 
   if (loading && !users.length && !allScripts.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-6">
-        <div className="w-16 h-16 border-4 border-brand-primary border-t-transparent rounded-full animate-spin shadow-[0_0_20px_rgba(0,102,255,0.3)]"></div>
-        <p className="text-dim font-black uppercase tracking-widest text-sm animate-pulse">{t.loading}</p>
+      <div className="flex flex-col items-center justify-center py-24">
+        <LoadingVideo size="xl" />
       </div>
     );
   }
