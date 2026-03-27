@@ -21,7 +21,7 @@ import LandingPage from './components/LandingPage';
 import WhatsAppWidget from './components/WhatsAppWidget';
 import { User, SiteConfig } from './types';
 import { translations } from './translations';
-import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot } from './firebase';
+import { auth, db, onAuthStateChanged, signOut, doc, getDoc, onSnapshot, updateDoc } from './firebase';
 
 const DEFAULT_CONFIG: SiteConfig = {
   logo: { type: 'image', value: '/logo.png' },
@@ -67,12 +67,36 @@ export default function App() {
   useEffect(() => {
     fetchSiteConfig();
     
+    const checkDailyCoins = async (userData: User) => {
+      if (!userData.daily_coin_allocation) return userData;
+      
+      const today = new Date().toISOString().split('T')[0];
+      if (userData.last_reset_date !== today) {
+        const updatedUser = {
+          ...userData,
+          usage_limit: userData.usage_limit + userData.daily_coin_allocation,
+          last_reset_date: today
+        };
+        try {
+          await updateDoc(doc(db, 'users', userData.id), {
+            usage_limit: updatedUser.usage_limit,
+            last_reset_date: today
+          });
+          return updatedUser;
+        } catch (e) {
+          console.error("Failed to update daily coins", e);
+        }
+      }
+      return userData;
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
+          let userData = userDoc.data() as User;
           userData.id = firebaseUser.uid;
+          userData = await checkDailyCoins(userData);
           setUser(userData);
           if (userData.role === 'manager' || userData.role === 'admin' || userData.email === 'abqareno@gmail.com') setActiveTab('admin');
         } else {
@@ -84,8 +108,9 @@ export default function App() {
         if (localUserId) {
           const userDoc = await getDoc(doc(db, 'users', localUserId));
           if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
+            let userData = userDoc.data() as User;
             userData.id = localUserId;
+            userData = await checkDailyCoins(userData);
             setUser(userData);
             if (userData.role === 'manager' || userData.role === 'admin' || userData.email === 'abqareno@gmail.com') setActiveTab('admin');
           } else {
@@ -375,10 +400,6 @@ export default function App() {
             </div>
 
             <div className="p-6 border-t border-white/5 space-y-3">
-              <button onClick={() => setIsEnglish(!isEnglish)} className="w-full flex items-center justify-center gap-3 p-3.5 rounded-2xl bg-white/5 text-dim hover:text-white hover:bg-white/10 transition-all font-bold text-sm border border-white/5">
-                <Globe className="w-5 h-5" />
-                {isEnglish ? 'العربية' : 'English'}
-              </button>
               <button onClick={handleLogout} className="w-full flex items-center justify-center gap-3 p-3.5 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-all font-bold text-sm uppercase tracking-widest">
                 <LogOut className="w-5 h-5" />
                 {t.logout}

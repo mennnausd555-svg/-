@@ -4,7 +4,19 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, ScriptHistory, Suggestion, SiteConfig } from '../types';
 import { translations } from '../translations';
 import SiteEditor from './SiteEditor';
-import { db, collection, query, getDocs, orderBy, doc, getDoc, updateDoc, setDoc, handleFirestoreError, OperationType } from '../firebase';
+import ScriptResults from './ScriptResults';
+import { db, collection, query, getDocs, orderBy, doc, getDoc, updateDoc, setDoc, deleteDoc, where, handleFirestoreError, OperationType } from '../firebase';
+
+const INPUT_LABELS: Record<string, { en: string; ar: string }> = {
+  topic: { en: 'Topic', ar: 'الموضوع' },
+  length: { en: 'Length', ar: 'الطول' },
+  minutes: { en: 'Duration (Min)', ar: 'المدة (دقائق)' },
+  curiosityLevel: { en: 'Curiosity', ar: 'مستوى الفضول' },
+  emotion: { en: 'Emotion', ar: 'العاطفة' },
+  dialect: { en: 'Dialect', ar: 'اللهجة' },
+  format: { en: 'Format', ar: 'الفورمات' },
+  fileData: { en: 'Attached File', ar: 'ملف مرفق' }
+};
 
 interface AdminDashboardProps {
   onImpersonate: (user: User) => void;
@@ -30,6 +42,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [editingUserData, setEditingUserData] = useState<Partial<User>>({});
   const [subscriptionData, setSubscriptionData] = useState({
@@ -40,6 +53,33 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [selectedScript, setSelectedScript] = useState<ScriptHistory | null>(null);
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      // Delete user document
+      await deleteDoc(doc(db, 'users', userToDelete.id));
+      
+      // Delete user's scripts
+      const scriptsQuery = query(collection(db, 'scripts'), where('user_id', '==', userToDelete.id));
+      const scriptsSnapshot = await getDocs(scriptsQuery);
+      const deleteScriptPromises = scriptsSnapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deleteScriptPromises);
+
+      // Delete user's suggestions
+      const suggestionsQuery = query(collection(db, 'suggestions'), where('user_id', '==', userToDelete.id));
+      const suggestionsSnapshot = await getDocs(suggestionsQuery);
+      const deleteSuggestionPromises = suggestionsSnapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deleteSuggestionPromises);
+
+      setUsers(users.filter(u => u.id !== userToDelete.id));
+      setUserToDelete(null);
+    } catch (err) {
+      console.error(err);
+      handleFirestoreError(err, OperationType.DELETE, `users/${userToDelete.id}`);
+    }
+  };
 
   const t = isEnglish ? translations.en : translations.ar;
 
@@ -360,7 +400,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
               placeholder={t.searchUsers}
               value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full ${isEnglish ? 'pl-16 pr-6' : 'pr-16 pl-6'} py-6 input-field text-lg`}
+              className={`w-full ${isEnglish ? '!pl-16 !pr-6' : '!pr-16 !pl-6'} py-6 input-field text-lg`}
             />
           </div>
 
@@ -436,8 +476,16 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                           <button 
                             onClick={() => onImpersonate(u)}
                             className="p-3 bg-white/5 text-dim hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all border border-white/5 hover:border-emerald-500/20"
+                            title={isEnglish ? 'Impersonate User' : 'انتحال شخصية المستخدم'}
                           >
                             <ExternalLink className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => setUserToDelete(u)}
+                            className="p-3 bg-white/5 text-dim hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all border border-white/5 hover:border-rose-500/20"
+                            title={isEnglish ? 'Delete User' : 'حذف المستخدم'}
+                          >
+                            <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
                       </td>
@@ -462,7 +510,7 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
               placeholder={t.searchScripts}
               value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full ${isEnglish ? 'pl-16 pr-6' : 'pr-16 pl-6'} py-6 input-field text-lg`}
+              className={`w-full ${isEnglish ? '!pl-16 !pr-6' : '!pr-16 !pl-6'} py-6 input-field text-lg`}
             />
           </div>
 
@@ -563,6 +611,62 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
           ))}
         </div>
       )}
+
+      {/* Delete User Confirmation Modal */}
+      <AnimatePresence>
+        {userToDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUserToDelete(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 40 }}
+              className="relative glass-card w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden border border-rose-500/20"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-rose-500/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center border border-rose-500/20">
+                    <Trash2 className="w-6 h-6 text-rose-400" />
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">{isEnglish ? 'Delete User' : 'حذف المستخدم'}</h3>
+                </div>
+                <button onClick={() => setUserToDelete(null)} className="p-3 hover:bg-white/10 rounded-2xl transition-all text-dim hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-8">
+                <p className="text-dim font-medium text-center leading-relaxed">
+                  {isEnglish ? 'Are you sure you want to permanently delete ' : 'هل أنت متأكد من أنك تريد حذف '}
+                  <span className="text-white font-black">{userToDelete.name}</span>
+                  {isEnglish ? ' and all their associated data? This action cannot be undone.' : ' وجميع بياناته نهائياً؟ لا يمكن التراجع عن هذا الإجراء.'}
+                </p>
+                
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setUserToDelete(null)}
+                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black uppercase tracking-widest transition-all border border-white/5"
+                  >
+                    {isEnglish ? 'Cancel' : 'إلغاء'}
+                  </button>
+                  <button 
+                    onClick={handleDeleteUser}
+                    className="flex-1 py-4 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-500/20"
+                  >
+                    {isEnglish ? 'Delete' : 'حذف'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* User Edit Modal */}
       <AnimatePresence>
@@ -682,6 +786,17 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                     />
                   </div>
 
+                  {/* Daily Coin Allocation */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Daily Coin Allocation' : 'العملات اليومية المخصصة'}</label>
+                    <input 
+                      type="number" 
+                      value={editingUserData.daily_coin_allocation || 0}
+                      onChange={(e) => setEditingUserData({ ...editingUserData, daily_coin_allocation: parseInt(e.target.value) || 0 })}
+                      className="w-full input-field font-black uppercase tracking-widest text-sm"
+                    />
+                  </div>
+
                   {/* Subscription Status */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-dim uppercase tracking-widest px-2">{isEnglish ? 'Subscription Status' : 'حالة الاشتراك'}</label>
@@ -762,19 +877,29 @@ export default function AdminDashboard({ onImpersonate, isEnglish, defaultView =
                 <div className="space-y-6">
                   <p className="text-[10px] font-black text-dim uppercase tracking-[0.2em] px-2">{t.inputs}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {Object.entries(selectedScript.inputs || {}).map(([key, val]: [string, any]) => (
-                      <div key={key} className="p-6 bg-white/5 rounded-[2rem] border border-white/5">
-                        <span className="text-[10px] text-dim font-black uppercase tracking-widest block opacity-50 mb-1">{key}</span>
-                        <span className="text-sm font-bold text-white block">{val}</span>
-                      </div>
-                    ))}
+                    {Object.entries(selectedScript.inputs || {}).map(([key, val]: [string, any]) => {
+                      if (!val || key === 'fileData') return null;
+                      const label = INPUT_LABELS[key]?.[isEnglish ? 'en' : 'ar'] || key;
+                      return (
+                        <div key={key} className="p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                          <span className="text-[10px] text-dim font-black uppercase tracking-widest block opacity-50 mb-1">{label}</span>
+                          <span className="text-sm font-bold text-white block">{String(val)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="space-y-6">
                   <p className="text-[10px] font-black text-dim uppercase tracking-[0.2em] px-2">{t.generate}</p>
-                  <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 prose prose-invert max-w-none">
-                    <pre className="whitespace-pre-wrap font-sans text-dim leading-relaxed">{typeof selectedScript.content === 'string' ? selectedScript.content : JSON.stringify(selectedScript.content, null, 2)}</pre>
+                  <div className="space-y-8">
+                    {Array.isArray(selectedScript.content) ? (
+                      <ScriptResults results={selectedScript.content as any} isEnglish={isEnglish} />
+                    ) : (
+                      <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/5 prose prose-invert max-w-none">
+                        <pre className="whitespace-pre-wrap font-sans text-dim leading-relaxed">{typeof selectedScript.content === 'string' ? selectedScript.content : JSON.stringify(selectedScript.content, null, 2)}</pre>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -124,7 +124,7 @@ export default function Suggestions({ user, isEnglish, isAdmin = false, config, 
             <input
               type="text"
               placeholder={t.search}
-              className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'} text-lg`}
+              className={`input-field py-4 ${isEnglish ? '!pl-16' : '!pr-16'} text-lg`}
               value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -302,7 +302,7 @@ export default function Suggestions({ user, isEnglish, isAdmin = false, config, 
                   </div>
                   <input
                     type="url"
-                    className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'}`}
+                    className={`input-field py-4 ${isEnglish ? '!pl-16' : '!pr-16'}`}
                     value={link || ''}
                     onChange={(e) => {
                       const newLinks = [...links];

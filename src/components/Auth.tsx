@@ -311,7 +311,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
+                  className={`input-field ${isEnglish ? '!pl-16' : '!pr-16'}`}
                   placeholder="01xxxxxxxxx"
                   required
                 />
@@ -328,7 +328,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
+                  className={`input-field ${isEnglish ? '!pl-16' : '!pr-16'}`}
                   placeholder="••••••••"
                   required
                 />
@@ -386,7 +386,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                           type="text"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          className={`input-field ${isEnglish ? 'pl-20' : 'pr-20'}`}
+                          className={`input-field ${isEnglish ? '!pl-20' : '!pr-20'}`}
                           placeholder={isEnglish ? 'John Doe' : 'أحمد محمد'}
                           required={!isLogin}
                         />
@@ -405,7 +405,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className={`input-field ${isEnglish ? 'pl-20' : 'pr-20'}`}
+                          className={`input-field ${isEnglish ? '!pl-20' : '!pr-20'}`}
                           placeholder="01xxxxxxxxx"
                           required={!isLogin}
                         />
@@ -427,7 +427,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
+                    className={`input-field ${isEnglish ? '!pl-16' : '!pr-16'}`}
                     placeholder={isEnglish ? 'name@example.com or 01xxxxxxxxx' : 'البريد الإلكتروني أو 01xxxxxxxxx'}
                     required
                   />
@@ -446,7 +446,7 @@ export default function Auth({ onLogin, isEnglish, setIsEnglish, config, onSelec
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`input-field ${isEnglish ? 'pl-20' : 'pr-20'}`}
+                    className={`input-field ${isEnglish ? '!pl-20' : '!pr-20'}`}
                     placeholder="••••••••"
                     required
                   />

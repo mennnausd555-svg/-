@@ -185,7 +185,7 @@ export default function EvaluationSection({ isEnglish, user, config, onSelectEle
               <select
                 value={dialect || ''}
                 onChange={(e) => setDialect(e.target.value as Dialect)}
-                className="input-field appearance-none cursor-pointer pr-12"
+                className="input-field appearance-none cursor-pointer !pr-12"
               >
                 {DIALECTS.map((d) => (
                   <option key={d} value={d}>{d}</option>

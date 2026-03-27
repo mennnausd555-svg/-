@@ -261,7 +261,7 @@ export default function FilmedScripts({ user, isEnglish, isAdmin, config, onSele
                   value={videoLink || ''}
                   onChange={(e) => setVideoLink(e.target.value)}
                   placeholder="https://tiktok.com/@user/video/..."
-                  className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
+                  className={`input-field ${isEnglish ? '!pl-16' : '!pr-16'}`}
                   required
                 />
               </div>
@@ -287,7 +287,7 @@ export default function FilmedScripts({ user, isEnglish, isAdmin, config, onSele
             placeholder={isEnglish ? "Search by user name, phone, or title..." : "ابحث باسم المستخدم، رقم الهاتف، أو العنوان..."}
             value={searchQuery || ''}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`input-field ${isEnglish ? 'pl-16' : 'pr-16'}`}
+            className={`input-field ${isEnglish ? '!pl-16' : '!pr-16'}`}
           />
         </div>
       )}

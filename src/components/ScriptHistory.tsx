@@ -215,7 +215,7 @@ export default function ScriptHistoryView({ isEnglish, user }: ScriptHistoryProp
  <input
  type="text"
  placeholder={isEnglish ? 'Search history...' : 'بحث في السجل...'}
- className={`input-field ${isEnglish ? 'pl-10' : 'pr-10'}`}
+ className={`input-field ${isEnglish ? '!pl-10' : '!pr-10'}`}
  value={searchTerm || ''}
  onChange={(e) => setSearchTerm(e.target.value)}
  />

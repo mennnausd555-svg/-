@@ -28,6 +28,8 @@ export interface User {
   usage_limit: number;
   initial_limit: number;
   usage_period: 'daily' | 'weekly' | 'monthly';
+  daily_coin_allocation?: number;
+  last_reset_date?: string;
   subscription_status?: 'normal' | 'premium';
   profile_pic?: string;
   social_links?: string; // JSON string
@@ -131,20 +133,31 @@ export type Dialect =
 export type VideoLength = 'قصير' | 'طويل';
 
 export const FORMATS = [
-  'أنا جربت / التحديات (Challenges & Experiments)',
-  'القائمة / أفضل 5 أشياء (List / Top 5)',
-  'المقارنة / الأغلى والأرخص (Comparison)',
-  'كسر المعتقدات / الصدمة (Myth Busting)',
-  'أسئلة للغرباء في الشارع (Street Interviews)',
+  'المقارنة (Comparison)',
+  'قصص العملاء (Client Stories)',
+  'أنا كـ [تخصصي] مستحيل.. (I Would Never [Specialty] As a)',
+  'أسئلة الشارع (Street Interviews)',
+  'سؤال الخبير السريع (Expert Rapid Q&A)',
+  'خمن مين في 30 ثانية (Guess Who)',
+  'أنا جربت (I Tried / Challenges)',
+  'أنا اتعلمت (Transformation)',
+  'القائمة / أفضل (عدد) أشياء (Top List)',
+  'هيحصل إيه لو (What If)',
+  'اعمل بذكاء وليس بجهد (Work Smart, Not Hard)',
+  'كسر المعتقدات (Myth Busting)',
+  'الاسكتش (Sketch Dialogue)',
+  'إياك تعمل كذا (Mistakes to Avoid)',
+  'الأسرار والخدع (Hidden Hacks)',
+  'البديل الأفضل (The Smart Alternative)',
+  'اختبار المنتج / (Product Testing / VSL)',
+  'تعالوا أقولكم إزاي (How I Did It)',
+  'الفلوج الهادف (Purposeful Vlog)',
+  'نصيحة العمر (Authority Advice)',
   'الريأكشن (Reaction)',
-  'الاسكتش / الحوار (Sketch / Dialogue)',
-  'المسابقات / الفلوجات (Competitions / Vlogs)',
-  'الفلوج / يوم في حياتي (Vlog)',
-  'أنا اتعلمت / التحويل (Transformation)',
-  'التريندات (Trends)',
-  'الأسرار / الخدع (Hacks & Secrets)',
-  'ماذا لو؟ / الغموض (What If Scenarios)',
-  'نصيحة العمر / سلطة الخبير (Authority Advice)',
-  'فيديو البيع (VSL - Video Sales Letter)',
-  'أسلوب شهاب (Shehab Style)'
+  'المسابقات (Competitions & Stakes)',
+  'الوثائقي السريع (Mini-Documentary)',
+  'تقييم التريندات (Trend Review)',
+  'تخيل إن (Imagine If)',
+  'تريندات تتناسب مع مجالك',
+  'المناسبات حسب مجالك'
 ];

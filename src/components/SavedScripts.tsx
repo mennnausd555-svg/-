@@ -202,7 +202,7 @@ export default function SavedScripts({ user, isEnglish, isAdmin = false, config,
           <input
             type="text"
             placeholder={t.search}
-            className={`input-field py-4 ${isEnglish ? 'pl-16' : 'pr-16'} text-lg`}
+            className={`input-field py-4 ${isEnglish ? '!pl-16' : '!pr-16'} text-lg`}
             value={searchTerm || ''}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
